@@ -20,7 +20,10 @@ GitHub 上ではまともに読めませんので注意してください。
 本ドキュメントを底本として、
 「独習アセンブラ (新版)」が 2021 年 9 月に翔泳社から出版されました。
 
-## License
+## 本書のライセンスについて
+
+本書のライセンスは、
+クリエイティブコモンズ表示 - 非営利 - 継承 4.0 国際 (CC BY-NC-SA 4.0) です。
 
 Modern Assembly Language Programming (モダン アセンブリ言語プログラミ
 ング) is licensed under a Creative Commons
@@ -34,3 +37,11 @@ Commons License for more details.
 
 You should have received a copy of the license along with this work.
 If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+## Docker コンテナ
+
+本書で使用しているツールやライブラリ一式をインストールした Docker コンテナを、
+Docker Hub 上で公開しています。
+詳細については以下を参照してください。
+
+https://github.com/h-ohsaki/modern-asm/blob/master/Docker.md
