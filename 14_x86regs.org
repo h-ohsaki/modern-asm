@@ -1,0 +1,1088 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* x86 命令セット (レジスタ)
+<<ch:x86regs>>
+
+** IA-32 アーキテクチャの CPU
+<<sec:x86regs/cpu>>
+
+#+caption: IA-32 アーキテクチャの特徴
+#+label: tab:x86regs/ia32
+| 命令セットの種別     | CISC                                                               |
+| レジスタの大きさ     | 32 ビット (16 ビット、8 ビットでのアクセスも可)                    |
+| 汎用レジスタ数       | 8                                                                  |
+| プログラムカウンタ   | EIP レジスタ                                                       |
+| スタックポインタ     | ESP レジスタ                                                       |
+| 特殊レジスタ         | セグメントレジスタ、FPU レジスタ、MMX レジスタ                     |
+|                      | XMM レジスタ、YMM レジスタ、各種制御レジスタ                       |
+| フラグレジスタ       | EFLAGS レジスタ                                                    |
+|                      | OF フラグ, SF フラグ, ZF フラグ、PF フラグ、AF フラグ、ほか 6 種類 |
+| 命令数               | 500 以上 (ニーモニック数)                                          |
+| 命令語の大きさ       | 1～15 バイト                                                       |
+| データサイズ         | 32 ビット (ダブルワード)、16 ビット (ワード)、8 ビット (バイト)    |
+| 浮動小数点演算命令   | あり (CPU のモデルによる)                                          |
+| SIMD 命令            | MMX、SSE、SSE2、SSE3、AVX、AVX2、AVX-512 (CPU のモデルによる)        |
+| メモリアドレス       | 32 ビット                                                          |
+| エンディアンネス     | リトルエンディアン                                                 |
+| メモリ保護           | あり                                                               |
+| ハードウェア割り込み | あり                                                               |
+| ソフトウェア割り込み | あり                                                               |
+
+IA-32 アーキテクチャの CPU には、
+インテルの 80386、
+80486、
+Pentium、
+Pentium II、
+Pentium III、
+Pentium 4、
+Pentium M、
+Celeron、
+Core、
+Xeon などが存在します。
+
+IA-32 アーキテクチャの大きな特徴の 1 つに、
+インテルが過去に発表した CPU との *後方互換性 (backward compatibility)* を持っているという点が挙げられます。
+IA-32 アーキテクチャの CPU は、
+インテルが 1987 年に発表した 16 ビット CPU の 8086、
+8088 や、
+1982 年に発表した 16 ビット CPU の 80286 とバイナリレベルでの後方互換性を持っています。
+バイナリレベルの後方互換性とは、
+例えば、
+「8086 の機械語プログラムを、
+IA-32 アーキテクチャの CPU 上でもそのまま実行できる」ことを意味します。
+したがって、
+例えば、
+数十年前に作成された 8086 向けのプログラムを、
+インテルの最新の CPU 上でそのまま実行することが可能です。
+
+#+begin_note
+例えば、
+8086 用に書かれたオペレーティングシステムである MS-DOS (機械語のプログラム) を、
+最新の CPU 上でもそのまま動作させることができます。
+
+ただし、
+あくまで CPU レベルでの互換性です。
+最新の CPU は、
+8086 用に書かれたプログラムを実行はできますが、
+実行できるからといって MS-DOS が正常に動作するとは限りません。
+MS-DOS がサポートするメモリや入出力デバイス (フロッピーディスク、
+キーボード、
+ディスプレイなど) が存在しなければ、
+まともに利用できないからです。
+#+end_note
+
+最近の CPU には、
+Pentium 4 や Core などの名前が付けられていますが、
+インテルの CPU には当初、
+8086、
+80286、
+80386、
+80486 などの型番が付けられていました。
+インテルの CPU は過去の CPU との後方互換性を持っていたこともあり、
+これらの CPU はまとめて *80x86* と呼ばれていました。
+当初、
+これらの CPU において互換性のある、
+80x86 の *命令セットアーキテクチャ (ISA; Instruction Set Architecture)* は *x86* と呼ばれていました。
+IA-32 アーキテクチャの CPU は、
+8086 との後方互換性を持っているため、
+IA-32 アーキテクチャの命令セットは x86 を含む、
+と言うことができます。
+
+しかし、
+話がややこしいのですが、
+x86 という用語は、
+現在では IA-32 アーキテクチャの命令セットを意味する用語として広く使われています。
+IA-32 アーキテクチャの CPU は、
+インテルの最初の 32 ビット CPU である 80386 との後方互換性を持っています。
+そこで現在では、
+80386 以降の CPU において互換性のある、
+80386 の命令セットも x86 と呼ばれています。
+IA-32 アーキテクチャの CPU は、
+80386 との後方互換性を持っているので、
+「IA-32 アーキテクチャの命令セットは x86 を含む」と言うことができます。
+
+つまり、x86 には
+- 8086 以降の CPU で共通の命令セット
+- 80386 以降の CPU で共通の命令セット
+という 2 つの意味があります。
+現在は主に後者の意味で用いられていますが、
+前者の意味で用いられることもあるため注意が必要です。
+本書では、
+後者 (80386 以降の CPU で共通の命令セット) という意味で用いています。
+
+** IA-32 アーキテクチャのドキュメント
+<<sec:x86regs/document>>
+
+本書を執筆するにあたり、
+IA-32 アーキテクチャにおけるアセンブリ言語プログラミングの書籍をいろいろ入手して読んでみました。
+それらの中では、
+文献 \cite{Ohnuki06:x86} は適度に詳しく、
+IA-32 アーキテクチャにおけるアセンブリ言語プログラミングの参考書として優れています。
+しかし、
+残念ながら、
+この本は現在すでに絶版となっています。
+
+良書が不足している理由は、
+アセンブリ言語プログラミングが、
+一般のエンドユーザにとってそれほど身近なものではなくなったためと思われます。
+現在は、
+コンパイラ言語やインタプリタ言語が高度化・高機能化したこともあり、
+アセンブリ言語プログラミングが一切できなくても、
+大抵のプログラムであれば書くことが可能です。
+
+その一方、
+現在はインターネットが普及し、
+データシートやリファレンスマニュアルのようなベンダの技術文書の多くが無料で入手できます。
+一昔前は、
+製本された、
+分厚いデータシートやリファレンスマニュアルを、
+数万円以上を支払って購入するしかなかったのですから、
+とてもよい時代になったと言えます。
+
+IA-32 アーキテクチャに関しては、
+当然ながらインテルが発行している技術文書が一番よい資料です。
+
+- Intel(R) 64 and IA-32 Architectures Software Developer's Manual
+  \cite{Intel20:IA32}
+
+  IA-32 アーキテクチャと、
+  その 64 ビット拡張である Intel 64 のソフトウェア開発者向け  マニュアルです。
+  2020 年 11 月版で 5 066 ページもあります。
+  同じタイトルのまま、
+  内容が随時アップデートされています。
+
+  私が最初に入手したのは 2013 年 9 月でしたが、
+  このときはまだ 3 298 ページでした。
+  7 年間でページ数がなんと 1.5 倍に増えています。
+  2013 年に始めて見たときもページ数の多さに驚きましたが、
+  その当時をさらに上回るボリュームになっています。
+
+  内容は以下の 4 巻に分かれています。
+  - Volume 1: Basic Architecture (基本アーキテクチャ)
+  - Volume 2: Instruction Set Reference (命令セットリファレンス) A--Z
+  - Volume 3: System Programming Guide (システムプログラミングガイド)
+  - Volume 4: Mode-Specific Registers (モデル固有のレジスタ)
+
+  当然ですが、
+  IA-32 アーキテクチャに関して最も信頼がおける資料です。
+  ただし、
+  IA-32 アーキテクチャだけでなく、
+  64 ビット拡張である Intel 64 の説明も混在しています。
+  IA-32 アーキテクチャのことだけを理解するのであれば、
+  次の日本語版のほうがよいかもしれません。
+
+- IA-32 インテル(R) アーキテクチャー・ソフトウェア・デベロッパーズ・マニュアル、
+  上巻: 基本アーキテクチャー \cite{Intel04:IA32J-1}
+- I-32 インテル(R) アーキテクチャー・ソフトウェア・デベロッパーズ・マニュアル、
+  中巻 A: 命令セット・リファレンス A--M \cite{Intel04:IA32J-2A}
+- IA-32 インテル(R) アーキテクチャー・ソフトウェア・デベロッパーズ・マニュアル、
+  中巻 B: 命令セット・リファレンス N--Z \cite{Intel04:IA32J-2B}
+- IA-32 インテル(R) アーキテクチャー・ソフトウェア・デベロッパーズ・マニュアル、
+  下巻: システム・プログラミング・ガイド \cite{Intel04:IA32J-3}
+
+  英語版のソフトウェア開発者向けマニュアルの日本語版 (2004 年発行) です。
+  4 巻あわせて 2 482 ページと  大変な量ですが、
+  英語版の 5 066 ページと比べれば半分程度です。
+
+  英語版のソフトウェア開発者向けマニュアルとは異なり、
+  IA-32 アーキテクチャの 32 ビット部分だけを説明しており、
+  64 ビット拡張である Intel 64 の説明は含まれていません。
+  こういったこともあり、
+  内容は 2004 年以降は更新されていません。
+  日本語訳の誤りは一部修正されているようですが、
+  基本的に内容は 2004 年当時のままです。
+
+  このため、
+  日本語版を読んでも、
+  IA-32 アーキテクチャの CPU の最新の情報はわかりません。
+  しかし逆に言えば、
+  64 ビット拡張である Intel 64 の説明が混じっていないため、
+  「IA-32 アーキテクチャとは何か」を理解する上では好都合です。
+  英語版のソフトウェア開発者向けマニュアルでは、
+  どの部分が IA-32 アーキテクチャの説明で、
+  どの部分が 64 ビット拡張の説明なのかを意識して読まなければいけませんが、
+  日本語版のソフトウェア開発者向けマニュアルでは、
+  どのページを開いても IA-32 アーキテクチャの説明だけであり、
+  IA-32 アーキテクチャのみに興味があるなら、
+  こちらのほうが理解しやすいでしょう。
+
+#+begin_note
+ただし、
+英語版の技術文書を翻訳した日本語版の技術文書によくある話ですが、
+日本語版は全体的に英語版の直訳になっていて、
+日本語版だけを読んでも意味を理解できない箇所がたくさんあります。
+このため、
+日本語版のソフトウェア開発者向けマニュアルを読んでも意味がよく理解できないときは、
+英語版の対応する箇所を読む (もしくは最初から英語版を読む) ことをおすすめします。
+#+end_note
+
+「こんなものアセンブリ言語プログラミングの初心者が読むようなものではない」と思うかもしれませんし、
+ある意味ではそのとおりです。
+IA-32 アーキテクチャは信じられないくらい複雑ですし、
+ドキュメントの量も膨大だからです。
+
+しかし、
+必ずしもすべてを理解することはなく、
+必要な (もしくは必要と思われる) 箇所だけをかいつまんで読むだけなら初心者でも可能です。
+そのため、
+「一見読みやすそうだが、
+ページ数が少なく、
+内容が充実していない書籍」などを読むよりは、
+ベンダの技術文書のような本物のドキュメントを読むことをおすすめします。
+
+** レジスタ
+<<sec:x86regs/register>>
+
+IA-32 アーキテクチャにおける汎用レジスタの概要は [[sec:cpu/ia32-register]] 節で説明しました。
+IA-32 アーキテクチャの命令セットを理解するためには、
+レジスタについてもう少し詳しく知っておく必要があります。
+
+IA-32 アーキテクチャの主な *レジスタ* の一覧を図 [[fig:x86regs/reg]] に示します。
+IA-32 アーキテクチャの主なレジスタは、
+汎用レジスタ、
+セグメント・レジスタ、
+プログラム・ステータス・制御レジスタ、
+命令ポインタと呼ばれる 4 種類です。
+
+#+caption: IA-32 アーキテクチャのレジスタ
+#+label: fig:x86regs/reg
+#+attr_latex: :width .7\columnwidth
+[[./figure/x86regs/reg.png]]
+
+#+begin_note
+これら 4 種類のレジスタ以外にも、
+x87 FPU (Floating-Point Unit) レジスタ ([[sec:x86fp/x87-model]] 節)、
+MMX レジスタ、
+XMM レジスタ、
+YMM レジスタなどもあります。
+#+end_note
+
+1 つ目は、
+EAX、
+EBX、
+ECX、
+EDX、
+ESI、
+EDI、
+EBP と呼ばれる、
+8 つの *汎用レジスタ (general-purpose register)* です。
+これらの汎用レジスタは、
+レジスタとメモリの間のデータ転送や、
+ALU による算術演算・論理演算などに使用されます。
+
+前述のように、
+IA-32 アーキテクチャは、
+8086 や 80286 など、
+インテルが過去に発表した CPU との後方互換性を持っています。
+このため、
+IA-32 アーキテクチャでは、
+EAX、
+EBX、
+ECX、
+EDX、
+ESI、
+EDI、
+EBP などの汎用レジスタを、
+8086 や 80286 のレジスタと同じようにアクセスすることもできます (図 [[fig:x86regs/reg-access]])。
+IA-32 アーキテクチャにおける汎用レジスタの大きさはすべて 32 ビットですが、
+これらの 32 ビットレジスタの下位 16 ビットや下位 8 ビットにアクセスすることもできます。
+
+#+caption: IA-32 アーキテクチャの汎用レジスタと別名によるアクセス
+#+label: fig:x86regs/reg-access
+[[./figure/x86regs/reg-access.png]]
+
+例えば、
+レジスタ EAX は 32 ビットレジスタですが、
+レジスタ EAX の下位 16 ビットは「レジスタ AX」としても利用できます。
+レジスタ AX を読み出せば、
+レジスタ EAX の下位 16 ビットが読み出されます。
+レジスタ AX に書き込めば、
+レジスタ EAX の下位 16 ビットに書き込まれます。
+また、
+レジスタ AH およびレジスタ AL として、
+レジスタ AX (つまり、
+レジスタ EAX の下位 16 ビット) の上位 8 ビットおよび下位 8 ビットにそれぞれアクセスすることができます。
+
+2 つ目は、
+CS、
+DS、
+SS、
+ES、
+FS、
+GS と呼ばれる 6 つの *セグメントレジスタ (segment register)* です。
+セグメント・レジスタは使用するセグメント (アドレス空間の一部) を指定するためのレジスタです。
+ただし、
+これらのセグメントレジスタは通常、
+オペレーティングシステムが管理しているため、
+本書で扱っているような、
+オペレーティングシステム上で動作するアプリケーションプログラムからは操作できません。
+
+3 つ目は、
+EFLAGS と呼ばれる *プログラムステータス制御レジスタ (program status and control register)* です。
+IA-32 アーキテクチャにおけるプログラムステータス制御レジスタ EFLAGS は、
+いわゆる *フラグレジスタ (flag register)* の一種です (図 [[fig:x86regs/eflags]])。
+
+#+caption:レジスタ EFLAGS と各ビットの意味
+#+label: fig:x86regs/eflags
+#+attr_latex: :width \textwidth
+[[./figure/x86regs/eflags.png]]
+
+EFLAGS は 2 進数や 10 進数の値ではなく、
+EFLAGS の 0～31 番目の各ビットがそれぞれ個別の意味を持っています。
+例えば、
+図 [[fig:x86regs/eflags]] 中の *ステータスフラグ (status flag)* は、
+ALU による演算結果に応じて、
+各ビットの値が 0 または 1 に自動的に設定されます。
+
+EFLAGS には、
+*ステータスフラグ (status flag)*、
+*制御フラグ (control flag)*、
+*システムフラグ (system flag)* の 3 種類がありますが、
+特に重要なのはシステムフラグです。
+その中でも特に重要なのは、
+以下の 3 つのステータスフラグです。
+
+- キャリーフラグ (CF (Carry Flag))
+
+  ALU による算術演算・論理演算などにおいて、
+  *桁あふれ (overflow)* が起きた場合に *キャリーフラグ* がセットされます (EFLAGS の 0 ビット目が 1 になります)。
+  桁あふれが起きなかった場合はリセットされます (EFLAGS の 0 ビット目が 0 になります)。
+
+  例えば、
+  説明の簡単化のため、
+  レジスタの大きさが 8 ビットの場合を考えます。
+  ALU を用いて 0x78 + 0x9a (= 78 + 154) という 8 ビットの加算をすると、
+  計算結果が 0x112 となりますが、
+  レジスタの大きさが 8 ビットであれば最上位の桁があふれて、
+  レジスタには下位 8 ビットの 0x12 のみが格納されます。
+  このとき、
+  (実際には存在しない) 9 ビット目の桁に繰り上がりが起こり (9 ビット目の桁がないので捨てられる)、
+  キャリーフラグの値が 1 になります。
+
+  同様に、
+  ALU を用いて 0x78 - 0x9a (= 78 - 154) という 8 ビットの減算をすると、
+  計算結果が -34 (= 0xde (2 の補数表現)) となりますが、
+  レジスタの大きさが 8 ビットなので、
+  最上位の桁からの繰り下がりが起こります。
+  このとき、
+  存在しない 9 ビット目の桁から繰り下がりが起こり、
+  キャリーフラグの値が 1 になります。
+
+  #+begin_note
+  上の例では、
+  0x78 - 0x9a を計算していますが、
+  (実際には存在しない) 9 ビット目に 1 があると考えて、
+  0x178 - 0x9a = 0xde を計算しているのと同じ意味になります。
+  #+end_note
+
+- ゼロフラグ (ZF (Zero Flag))
+
+  ALU による算術演算・論理演算などにおいて、
+  結果がゼロであった場合に *ゼロフラグ* がセットされます (EFLAGS の 6 ビット目が 1 になります)。
+  結果がゼロでなければリセットされます (EFLAGS の 6 ビット目が 0 になります)。
+
+- 符号 (サイン) フラグ (SF (Sign Flag))
+
+  ALU による算術演算・論理演算などにおいて、
+  結果が負であった場合に符号フラグがセットされます (EFLAGS の 7 ビット目が 1 になる)。
+  結果が正であればリセットされます (EFLAGS の 7 ビット目が 0 になります)。
+
+ただし、
+あらゆる算術演算・論理演算の命令の実行によって、
+これらのフラグが必ず設定されるわけではないことに注意が必要です。
+どの命令を実行すると、
+どのフラグが設定 (セットまたはリセット) されるかは、
+それぞれの命令の仕様で決まっています。
+詳細については文献 \cite{Intel20:IA32} などを確認してください。
+
+4 つ目は、
+EIP と呼ばれる *命令ポインタ (instruction pointer)* です。
+次に実行する命令が格納されているメモリのアドレスを差しています。
+いわゆる *プログラムカウンタ (program counter)* です。
+多くの CPU ではプログラムカウンタと呼ばれていますが、
+インテルの CPU では命令ポインタと呼ばれています。
+
+** 命令の分類
+<<sec:x86regs/category>>
+
+何度も書いているように、
+IA-32 アーキテクチャは信じられないくらい複雑です。
+
+IA-32 アーキテクチャの命令 (正確には、
+命令に相当するアセンブリ言語のニーモニック) をリストアップしてみましょう。
+
+#+begin_note
+X86 Opcode and Instruction Reference (http://ref.x86asm.net/coder.html) から機械的に抽出しました。
+#+end_note
+
+#+begin_quote
+AAA AAD AAM AAS ADC ADD ADDPD ADDPS ADDSD ADDSS ADDSUBPD ADDSUBPS ADX
+AMX AND ANDNPD ANDNPS ANDPD ANDPS ARPL BLENDPD BLENDPS BLENDVPD
+BLENDVPS BOUND BSF BSR BTC BTR BTS CALL CALLF CBW CDQ CLC CLD CLFLUSH
+CLI CLTS CMC CMOVB CMOVBE CMOVL CMOVLE CMOVNB CMOVNBE CMOVNL CMOVNLE
+CMOVNO CMOVNP CMOVNS CMOVNZ CMOVO CMOVP CMOVS CMOVZ CMP CMPPD CMPPS
+CMPS CMPSD CMPSS CMPXCHG CMPXCHG8B COMISD COMISS CPUID CRC32 CVTDQ2PD
+CVTDQ2PS CVTPD2DQ CVTPD2PI CVTPD2PS CVTPI2PD CVTPI2PS CVTPS2DQ
+CVTPS2PD CVTPS2PI CVTSD2SI CVTSD2SS CVTSI2SD CVTSI2SS CVTSS2SD
+CVTSS2SI CVTTPD2DQ CVTTPD2PI CVTTPS2DQ CVTTPS2PI CVTTSD2SI CVTTSS2SI
+CWD CWDE DAA DAS DEC DIV DIVPD DIVPS DIVSD DIVSS DPPD DPPS EMMS ENTER
+EXTRACTPS FABS FADD FADDP FBLD FBSTP FCHS FCLEX FCMOVB FCMOVBE FCMOVE
+FCMOVNB FCMOVNBE FCMOVNE FCMOVNU FCMOVU FCOM FCOM2 FCOMI FCOMIP FCOMP
+FCOMP3 FCOMP5 FCOMPP FCOS FDECSTP FDIV FDIVP FDIVR FDIVRP FFREE FFREEP
+FIADD FICOM FICOMP FIDIV FIDIVR FILD FIMUL FINCSTP FINIT FIST FISTP
+FISTTP FISUB FISUBR FLD FLD1 FLDCW FLDENV FLDL2E FLDL2T FLDLG2 FLDLN2
+FLDPI FLDZ FMUL FMULP FNCLEX FNDISI nop FNENI nop FNINIT FNOP FNSAVE
+FNSETPM nop FNSTCW FNSTENV FNSTSW FPATAN FPREM FPREM1 FPTAN FRNDINT
+FRSTOR FSAVE FSCALE FSIN FSINCOS FSQRT FST FSTCW FSTENV FSTP FSTP1
+FSTP8 FSTP9 FSTSW FSUB FSUBP FSUBR FSUBRP FTST FUCOM FUCOMI FUCOMIP
+FUCOMP FUCOMPP FWAIT FXAM FXCH FXCH4 FXCH7 FXRSTOR FXSAVE FXTRACT
+FYL2X FYL2XP1 GETSEC HADDPD HADDPS HINT_NOP HLT HSUBPD HSUBPS IDIV
+IMUL INC INS INSERTPS INT INT1 INTO INVD INVEPT INVLPG INVVPID IRET
+IRETD JBE JCXZ JECXZ JLE JMP JMPF JNB JNBE JNL JNLE JNO JNP JNS JNZ
+LAHF LAR LDDQU LDMXCSR LDS LEA LEAVE LES LFENCE LFS LGDT LGS LIDT LLDT
+LMSW LOCK LODS LOOP LOOPNZ LOOPZ LSL LSS LTR MASKMOVDQU MASKMOVQ MAXPD
+MAXPS MAXSD MAXSS MFENCE MINPD MINPS MINSD MINSS MONITOR MOV MOVAPD
+MOVAPS MOVBE MOVD MOVDDUP MOVDQ2Q MOVDQA MOVDQU MOVHLPS MOVHPD MOVHPS
+MOVLHPS MOVLPD MOVLPS MOVMSKPD MOVMSKPS MOVNTDQ MOVNTDQA MOVNTI
+MOVNTPD MOVNTPS MOVNTQ MOVQ MOVQ2DQ MOVS MOVSD MOVSHDUP MOVSLDUP MOVSS
+MOVSX MOVSXD MOVUPD MOVUPS MOVZX MPSADBW MUL MULPD MULPS MULSD MULSS
+MWAIT NEG NOP NOT ORPD ORPS OUT OUTS PABSB PABSD PABSW PACKSSDW
+PACKSSWB PACKUSDW PACKUSWB PADDB PADDD PADDQ PADDSB PADDSW PADDUSB
+PADDUSW PADDW PALIGNR PAND PANDN PAUSE PAVGB PAVGW PBLENDVB PBLENDW
+PCMPEQB PCMPEQD PCMPEQQ PCMPEQW PCMPESTRI PCMPESTRM PCMPGTB PCMPGTD
+PCMPGTQ PCMPGTW PCMPISTRI PCMPISTRM PEXTRB PEXTRD PEXTRW PHADDD
+PHADDSW PHADDW PHMINPOSUW PHSUBD PHSUBSW PHSUBW PINSRB PINSRD PINSRW
+PMADDUBSW PMADDWD PMAXSB PMAXSD PMAXSW PMAXUB PMAXUD PMAXUW PMINSB
+PMINSD PMINSW PMINUB PMINUD PMINUW PMOVMSKB PMOVSXBD PMOVSXBQ PMOVSXBW
+PMOVSXDQ PMOVSXWD PMOVSXWQ PMOVZXBD PMOVZXBQ PMOVZXBW PMOVZXDQ
+PMOVZXWD PMOVZXWQ PMULDQ PMULHRSW PMULHUW PMULHW PMULLD PMULLW PMULUDQ
+POP POPA POPAD POPCNT POPF POPFD POR PREFETCHNTA PREFETCHT0 PREFETCHT1
+PREFETCHT2 PSADBW PSHUFB PSHUFD PSHUFHW PSHUFLW PSHUFW PSIGNB PSIGND
+PSIGNW PSLLD PSLLDQ PSLLQ PSLLW PSRAD PSRAW PSRLD PSRLDQ PSRLQ PSRLW
+PSUBB PSUBD PSUBQ PSUBSB PSUBSW PSUBUSB PSUBUSW PSUBW PTEST PUNPCKHBW
+PUNPCKHDQ PUNPCKHQDQ PUNPCKHWD PUNPCKLBW PUNPCKLDQ PUNPCKLQDQ
+PUNPCKLWD PUSH PUSHA PUSHAD PUSHF PUSHFD PXOR RCL RCPPS RCPSS RCR
+RDMSR RDPMC RDTSC RDTSCP REP REPNZ REPZ RETF RETN ROL ROR ROUNDPD
+ROUNDPS ROUNDSD ROUNDSS RSM RSQRTPS RSQRTSS SAHF SAL SALC SAR SBB SCAS
+SETB SETBE SETL SETLE SETNB SETNBE SETNL SETNLE SETNO SETNP SETNS
+SETNZ SETO SETP SETS SETZ SFENCE SGDT SHL SHLD SHR SHRD SHUFPD SHUFPS
+SIDT SLDT SMSW SQRTPD SQRTPS SQRTSD SQRTSS STC STD STI STMXCSR STOS
+STR SUB SUBPD SUBPS SUBSD SUBSS SWAPGS SYSCALL SYSENTER SYSEXIT SYSRET
+TEST UCOMISD UCOMISS UNPCKHPD UNPCKHPS UNPCKLPD UNPCKLPS VERR VERW
+VMCALL VMCLEAR VMLAUNCH VMPTRLD VMPTRST VMREAD VMRESUME VMWRITE VMXOFF
+VMXON WBINVD WRMSR XADD XCHG XGETBV XLAT XMM9 XOR XORPD XORPS XRSTOR
+XSAVE XSETBV
+#+end_quote
+
+なんと 500 を超える命令があります!
+
+人間の脳は大変優秀なので、
+努力すればこれらの命令をすべて覚えることも不可能ではないでしょう。
+しかし、
+普通はこれらすべての命令を理解して覚えておく必要はありません。
+
+というのも、
+頻繁に使われる命令は数十命令程度であり、
+特に重要な命令だけを理解して、
+覚えておけば十分だからです。
+自分で IA-32 アーキテクチャ向けの最適化コンパイラを開発したり、
+IA-32 アーキテクチャの CPU の機能を活かした特殊なアセンブリ言語プログラムを開発したりしたいと思ったときに、
+そのときになって初めてデータシートを見ながらじっくり理解すれば十分でしょう。
+
+これらの 500 を超える命令の中には、
+浮動小数点演算や、
+マルチメディア処理、
+ベクトル演算、
+暗号化 / 復号化などの特殊な処理のための命令も含まれています。
+IA-32 アーキテクチャにおいて、
+レジスタ⇔メモリ間のデータ転送や、
+ALU を用いた算術演算・論理演算などの一般的な命令は、
+*汎用命令 (general-purpose instruction)* と呼ばれています。
+文献 \cite{Intel04:IA32J-1} では、
+汎用命令は以下のように分類されています (★印は筆者による)。
+
+- データ転送命令
+  - 汎用データ転送命令 ★
+  - 交換命令
+  - スタック操作命令 ★
+  - 型変換命令
+- 2 進算術命令
+  - 加算命令と減算命令 ★
+  - インクリメント命令とデクリメント命令 ★
+  - 比較命令と符号変更命令 ★
+  - 乗算命令と除算命令 ★
+- 10 進算術命令
+  -パックド BCD 調整命令
+  - アンパックド BCD 調整命令
+- 論理演算命令 ★
+- シフト命令とローテート命令
+  - ビットのシフト命令 ★
+  - ビットのダブルシフト命令
+  - ビットのローテート命令
+- ビット命令とバイト命令
+  - ビットテストおよび変更命令
+  - ビットスキャン命令
+  - 条件付きバイトセット命令
+  - テスト命令
+- 制御転送命令
+  - 無条件転送命令 ★
+  - 条件付き転送命令 ★
+  - ソフトウェア割り込み命令
+- ストリングの操作
+  - ストリング操作の反復
+- I/O 命令
+- ENTER 命令と LEAVE 命令
+- フラグ制御 (EFLAGS) 命令
+  - キャリーフラグおよび方向フラグ命令
+  - EFLAGS 転送命令
+  - 割り込みフラグ命令
+- セグメント・レジスタ命令
+  - セグメント・レジスタ・ロードおよびストア命令
+  - far 制御転送命令
+  - ソフトウェア割り込み命令
+  - far ポインタロード命令
+- その他の命令
+  - アドレス計算命令
+  - テーブル・ルックアップ命令
+  - プロセッサ識別命令
+  - ノー・オペレーション命令と未定義命令 ★
+
+汎用命令の分類だけでも膨大で、
+これらを理解する必要があると思うとくじけそうになります。
+しかし、
+普通にアセンブリ言語プログラミングを行うだけであれば、
+★印を付けた命令くらいを理解しておけば何とかなります。
+これらの命令は、
+汎用命令の中でも特に重要な命令です。
+
+** よく使われる命令ランキング
+<<sec:x86regs/ranking>>
+
+各命令の詳細に入る前に、
+まず x86 命令セットの全体像を眺めてみましょう。
+
+IA-32 アーキテクチャの膨大な数の命令のうち、
+どういった命令が、
+どの程度利用されているでしょうか?
+
+こういった疑問を持ったときには、
+Web 上の検索エンジンで「x86 命令よく使われる」などをキーワードにして検索する、
+というのが 1 つの方法です。
+しかし、
+実際にいくつかの検索エンジンで上記のキーワードで調べてみても、
+あまり有用そうな情報は見つかりませんでした。
+
+こういったケースでは、
+「日本語のキーワードで検索しているからダメ」ということがよくあります。
+日本語で書かれた情報と、
+英語で書かれた情報を比べると、
+圧倒的に英語で書かれた情報のほうが豊富です。
+特にアセンブリ言語プログラミングのような、
+どちらかと言えばニッチな分野では、
+特に日本語に限定して情報を探すのは得策ではありません。
+
+キーワードを英語にして、
+Web 上の検索エンジンで「x86 instructions frequently used」などで探してみると、
+図 [[fig:x86regs/stat]] のページが見つかりました。
+3 つのオープンソースのアプリケーションで利用されている命令を分析しているようです。
+
+#+caption: x86 Machine Code Statistics (https://www.strchr.com/x86_machine_code_statistics)
+#+label: fig:x86regs/stat
+[[./figure/x86regs/stat.png]]
+
+コンピュータやプログラミングの醍醐味は、
+「欲しいものがあれば、
+自分で作ることができる」という点です。
+欲しいプログラムがあれば書けばよいのです。
+欲しい情報があれば、
+欲しい情報を得るためのプログラムを書けばよいのです。
+
+では、
+早速やってみましょう。
+簡単なプログラムを書いて、
+IA-32 アーキテクチャにおける命令の使用頻度ランキングを調べてみましょう。
+
+手元にあるすべての機械語プログラムにおいて、
+それぞれの命令が何回ずつ使用されているかを数えて、
+命令の人気ランキングを作ってみます。
+
+今回は、
+Debian GNU/Linux の、
+~/usr/bin~ 以下のすべての実行ファイルを対象とします。
+#+begin_src sh
+$ ls /usr/bin | wc -l
+673
+#+end_src
+~ls~ コマンドと ~wc~ コマンドを組み合わせて、
+実行ファイルの数を数えました。
+673 個あります。
+~-l~ (lines) オプションによって行数 (正確には改行の数) を表示しています。
+
+~/usr/bin~ 以下にはシェルスクリプトなどのテキストファイルもあるので、
+ELF 形式の実行ファイルのみを対象にしましょう。
+それぞれの実行ファイルに対して ~file~ コマンドでファイルの種別を判定し、
+ELF 形式のものをピックアップします。
+#+begin_src sh
+$ for i in /usr/bin/*
+> do
+> file $i | grep ELF >/dev/null && echo $i
+> done | head -20
+/usr/bin/[
+/usr/bin/addpart
+/usr/bin/apt
+/usr/bin/apt-cache
+/usr/bin/apt-cdrom
+/usr/bin/apt-config
+/usr/bin/apt-get
+/usr/bin/apt-mark
+/usr/bin/arch
+/usr/bin/b2sum
+#+end_src
+~head~ コマンドにオプション ~-20~ を指定し、
+最初の 20 行のみを表示しています。
+
+ここで、
+ELF 形式の実行ファイル中に含まれる機械語命令のニーモニックを抽出する方法を考えます。
+~objdump~ コマンドを使えば、
+.text セクションを逆アセンブルできます。
+上で表示されているファイル ~/usr/bin/b2sum~ を例に取ります。
+#+begin_src sh
+$ objdump -d /usr/bin/b2sum | head -20
+
+/usr/bin/b2sum:     file format elf32-i386
+
+
+Disassembly of section .init:
+
+00001000 <.init>:
+    1000:       53                      push   %ebx
+    1001:       83 ec 08                sub    $0x8,%esp
+    1004:       e8 77 1b 00 00          call   2b80 <__cxa_finalize@plt+0x1790>
+    1009:       81 c3 f7 2f 01 00       add    $0x12ff7,%ebx
+    100f:       8b 83 d0 ff ff ff       mov    -0x30(%ebx),%eax
+    1015:       85 c0                   test   %eax,%eax
+    1017:       74 02                   je     101b <strcmp@plt-0x15>
+    1019:       ff d0                   call   *%eax
+    101b:       83 c4 08                add    $0x8,%esp
+    101e:       5b                      pop    %ebx
+    101f:       c3                      ret
+
+Disassembly of section .plt:
+#+end_src
+
+push、
+sub、
+call などの命令のニーモニックのカラムがそろっているため、
+何らかのテキスト処理で命令のニーモニックだけ取り出せそうです。
+ただ、
+よく見てみると ~objdump~ コマンドの出力はタブで区切られています。
+
+~cat~ コマンドに ~-T~ オプションを指定してタブを可視化してみます。
+#+begin_src sh
+$ objdump -d /usr/bin/b2sum  | cat -T | head -20
+
+/usr/bin/b2sum:     file format elf32-i386
+
+
+Disassembly of section .init:
+
+00001000 <.init>:
+    1000:^I53                   ^Ipush   %ebx
+    1001:^I83 ec 08             ^Isub    $0x8,%esp
+    1004:^Ie8 77 1b 00 00       ^Icall   2b80 <__cxa_finalize@plt+0x1790>
+    1009:^I81 c3 f7 2f 01 00    ^Iadd    $0x12ff7,%ebx
+    100f:^I8b 83 d0 ff ff ff    ^Imov    -0x30(%ebx),%eax
+    1015:^I85 c0                ^Itest   %eax,%eax
+    1017:^I74 02                ^Ije     101b <strcmp@plt-0x15>
+    1019:^Iff d0                ^Icall   *%eax
+    101b:^I83 c4 08             ^Iadd    $0x8,%esp
+    101e:^I5b                   ^Ipop    %ebx
+    101f:^Ic3                   ^Iret
+
+Disassembly of section .plt:
+#+end_src
+アドレス、
+機械語、
+逆アセンブル結果がタブで区切られていることがわかります。
+
+タブで区切られた、
+3 番目のフィールドを取り出しましょう。
+いろいろな方法がありますが、
+ここでは UNIX の伝統的なコマンドである ~cut~ コマンドを使いましょう。
+区切り文字にタブを指定し、
+3 番目のフィールドを取り出します。
+#+begin_src sh
+$ objdump -d /usr/bin/b2sum  | cut -d '        ' -f3 -s | head -20
+push   %ebx
+sub    $0x8,%esp
+call   2b80 <__cxa_finalize@plt+0x1790>
+add    $0x12ff7,%ebx
+mov    -0x30(%ebx),%eax
+test   %eax,%eax
+je     101b <strcmp@plt-0x15>
+call   *%eax
+add    $0x8,%esp
+pop    %ebx
+ret
+pushl  0x4(%ebx)
+jmp    *0x8(%ebx)
+add    %al,(%eax)
+
+jmp    *0xc(%ebx)
+push   $0x0
+jmp    1020 <strcmp@plt-0x10>
+jmp    *0x10(%ebx)
+push   $0x8
+#+end_src
+逆アセンブル結果だけをうまく取り出せました。
+~cut~ コマンドに ~-s~ オプションを指定して、
+3 番目のフィールドがある行のみを表示させています。
+~cut~ コマンドの ~-d~ オプション直後のシングルクォートの中は、
+(複数のスペースに見えますが) タブ 1 文字のみであることに注意してください。
+
+逆アセンブル結果の最初が命令のニーモニックです。
+これもいろいろな方法がありますが、
+再度 ~cut~ コマンドを使用します。
+区切り文字にスペースを指定して、
+最初のフィールドを取り出します。
+#+begin_src sh
+$ objdump -d /usr/bin/b2sum  | cut -d '        ' -f3 -s | cut -d ' ' -f1 | head -20
+push
+sub
+call
+add
+mov
+test
+je
+call
+add
+pop
+ret
+pushl
+jmp
+add
+
+jmp
+push
+jmp
+jmp
+push
+#+end_src
+
+これで単一の ELF 形式のプログラム中に含まれる機械語のニーモニックが取り出せるようになりました。
+これらを組み合わせると、
+~/usr/bin~ 以下のすべての ELF 形式のプログラムの命令の一覧が取り出せます。
+プログラムの数が多く、
+実行に時間がかかるため適当なファイルにいったん保存します。
+#+begin_src sh
+$ for i in /usr/bin/*
+> do
+> file $i | grep ELF >/dev/null && objdump -d $i | cut -d '    ' -f3 -s | cut -d ' ' -f1
+> done >mnemonics
+$ head -20 mnemonics
+push
+sub
+call
+add
+mov
+test
+je
+call
+add
+pop
+ret
+pushl
+jmp
+add
+
+jmp
+push
+jmp
+jmp
+push
+#+end_src
+
+命令のニーモニックの出現頻度を数えましょう。
+上によって得られた命令の一覧を ~sort~ コマンドでソートし、
+~uniq~ コマンドに ~-c~ (count) オプションを指定して重複する行の数を数えます。
+#+begin_src sh
+$ sort mnemonics | uniq -c | head -20
+ 138418
+  14173 adc
+    946 adcl
+ 890878 add
+    197 addb
+  21180 addl
+    106 addw
+  83722 and
+   1453 andb
+   1079 andl
+    140 andw
+     10 bsf
+    445 bsr
+   1435 bswap
+    800 bt
+      9 btl
+     46 bts
+ 892219 call
+      2 cbtw
+    118 cld
+#+end_src
+各命令の登場回数を求めることができました。
+ファイル ~mnemonics~ には空行が含まれていたため、
+空行の数 (138 418) も表示されています。
+
+空行を削除し、
+命令の登場回数の逆順にソートします。
+~grep~ コマンドに ~-v~ (inVert) オプションを指定して空行を除外し、
+~sort~ コマンドに ~-r~ (reverse) と ~-n~ (numeric) オプションを指定して登場回数の降順にソートします。
+#+begin_src sh
+$ grep -v '^$' mnemonics | sort | uniq -c | sort -rn | head -20
+2959003 mov
+1597653 push
+ 956427 lea
+ 892219 call
+ 890878 add
+ 569467 sub
+ 525677 je
+ 498539 jmp
+ 473150 test
+ 454503 pop
+ 408885 cmp
+ 366238 pushl
+ 336953 jne
+ 218921 movl
+ 195235 xor
+ 156793 xchg
+ 145321 ret
+ 122727 nop
+ 111286 movzbl
+  83722 and
+#+end_src
+無事、
+命令の登場回数の降順にソートされました。
+
+これで完成かと思いましたが、
+よく見てみると MOV 命令や PUSH 命令が複数回登場しています。
+GAS の接尾部の有無により、
+例えば、
+mov と movl の両方があります。
+これはどちらも同じ命令なので、
+まとめて集計したいことろです。
+
+これもいろいろな方法がありますが、
+movl の末尾の l は GAS が採用している AT&T 構文の接尾部でした ([[sec:gas/ia32-specific]] 節)。
+ということであれば、
+インテル構文で逆アセンブルすればよさそうです。
+早速試してみましょう。
+
+~objump~ コマンドは ~-M~ オプションで対象とするコンピュータやアセンブリ言語の構文を指定できます。
+#+begin_src sh
+$ objdump -d -M intel /usr/bin/b2sum | head -20
+
+/usr/bin/b2sum:     file format elf32-i386
+
+
+Disassembly of section .init:
+
+00001000 <.init>:
+    1000:       53                      push   ebx
+    1001:       83 ec 08                sub    esp,0x8
+    1004:       e8 77 1b 00 00          call   2b80 <__cxa_finalize@plt+0x1790>
+    1009:       81 c3 f7 2f 01 00       add    ebx,0x12ff7
+    100f:       8b 83 d0 ff ff ff       mov    eax,DWORD PTR [ebx-0x30]
+    1015:       85 c0                   test   eax,eax
+    1017:       74 02                   je     101b <strcmp@plt-0x15>
+    1019:       ff d0                   call   eax
+    101b:       83 c4 08                add    esp,0x8
+    101e:       5b                      pop    ebx
+    101f:       c3                      ret
+
+Disassembly of section .plt:
+#+end_src
+このように、
+期待通りうまくいきそうです。
+
+最終的に、
+これらのコマンドをまとめたシェルスクリプトにしておきましょう。
+以下のファイルを ~count-inst.sh~ という名前で保存します。
+
+読みやすくなるように少し変更し、
+コメントを追加してあります。
+
+筆者が使っている Debian GNU/Linux (i386) の ~/usr/bin~ 以下のすべての ELF 形式の実行ファイルを対象として、
+プログラム中に登場している機械語の命令の出現回数を数えるプログラムを作成しました (図 [[fig:x86regs/count-inst.sh]])。
+それぞれの実行ファイルを逆アセンブルし、
+命令のニーモニックの出現回数を数えています。
+
+#+caption: x86regs/count-inst.sh
+#+label: fig:x86regs/count-inst.sh
+#+include: "code/x86regs/count-inst.sh" src sh
+
+このシェルスクリプトを実行すると、
+出現回数の多い順に、
+出現回数と命令のニーモニックが出力されます。
+#+begin_src sh
+$ chmod +x count-inst.sh
+$ ./count-inst.sh >counts
+$ head -20 counts
+3244109 mov
+1963891 push
+ 956427 lea
+ 912361 add
+ 892219 call
+ 583284 sub
+ 536231 cmp
+ 525677 je
+ 504816 test
+ 498539 jmp
+ 454503 pop
+ 336953 jne
+ 195350 xor
+ 156793 xchg
+ 145321 ret
+ 129975 movzx
+ 122727 nop
+  86394 and
+  53707 or
+  41730 ja
+#+end_src
+
+出現回数を百分率の出現頻度にしたランキングも求めましょう。
+出現回数を出現率 (単位はパーセント) にし、
+~cat~ コマンドに ~-n~ (number) オプションを指定して順位も表示します (単に ~cat -n~ で行番号を付与しているだけです)。
+#+begin_src sh
+$ sum=`awk '{ sum += $1 } END { print sum }' counts`
+$ echo $sum
+12840157
+$ awk "{ printf \"%6.3f %s\n\", \$1/$sum*100, \$2 }" counts l cat -n
+#+end_src
+
+最終的に得られた命令の出現頻度ランキングが表 [[tab:x86regs/ranking]] です。
+153 種類の命令が使用されていました。
+数が多いため、
+ここでは出現頻度が 0.1% 以上のものだけを載せています。
+
+#+caption: Debian GNU/Linux (i386) の /usr/bin 以下の実行ファイルで使用されている命令ランキング
+#+label: tab:x86regs/ranking
+| 順位 | 出現率 (%) | 命令  |
+|------+------------+-------|
+|    1 |     25.265 | mov   |
+|    2 |     15.295 | push  |
+|    3 |      7.449 | lea   |
+|    4 |      7.106 | add   |
+|    5 |      6.949 | call  |
+|    6 |      4.543 | sub   |
+|    7 |      4.176 | cmp   |
+|    8 |      4.094 | je    |
+|    9 |      3.932 | test  |
+|   10 |      3.883 | jmp   |
+|   11 |      3.540 | pop   |
+|   12 |      2.624 | jne   |
+|   13 |      1.521 | xor   |
+|   14 |      1.221 | xchg  |
+|   15 |      1.132 | ret   |
+|   16 |      1.012 | movzx |
+|   17 |      0.956 | nop   |
+|   18 |      0.673 | and   |
+|   19 |      0.418 | or    |
+|   20 |      0.325 | ja    |
+|   21 |      0.259 | jbe   |
+|   22 |      0.213 | shl   |
+|   23 |      0.209 | shr   |
+|   24 |      0.199 | js    |
+|   25 |      0.193 | jle   |
+|   26 |      0.169 | sar   |
+|   27 |      0.163 | sbb   |
+|   28 |      0.142 | jae   |
+|   29 |      0.137 | imul  |
+|   30 |      0.131 | jg    |
+|   31 |      0.118 | adc   |
+|   32 |      0.118 | jb    |
+|   33 |      0.117 | sete  |
+|   34 |      0.112 | movsx |
+
+この出現頻度ランキングから、以下のようなことがわかります。
+- 機械語のプログラムの 99.9% は 34 種類の命令だけで構成されている
+- 最も頻繁に利用される命令は MOV 命令であり、全体の約 1/4 が MOV 命令である
+- 2 番目によく利用される命令はスタック操作の PUSH 命令である
+- 3 番目によく利用される命令は実効アドレス (オペランドに指定したメモリ
+  ロケーションのアドレス) を読み込む LEA 命令である
+
+IA-32 アーキテクチャには 500 を超える命令がありますが、
+機械語のプログラムの 99.9% は、
+たかだか 34 種類の命令さえ知っていれば理解できることがわかります。
+34 種類なら、
+それほど苦労しなくてもマスターできそうです。
+
+#+begin_note
+ここで示した IA-32 アーキテクチャの命令出現頻度ランキングは、
+これはこれで正しいのですが、
+この結果を誤って一般化しないように注意が必要です。
+
+この結果から、
+「世界中で動作している IA-32 アーキテクチャ上のプログラムの 25% は MOV 命令である」とか、
+「命令の 25% は MOV 命令なので、
+MOV 命令の実行時間を 1/2 にできればプログラムの実行時間が約 88 % に短縮される (0.75 + 0.25 / 2 = 0.875 だから)。
+」のようなことは *言えません*。
+
+例えば、以下の点に注意が必要です。
+- ある特定のオペレーティングシステム (i386 版の Debian GNU/Linux) の、
+  ある特定の時点のスナップショットにおいて集計した結果である
+- ELF 形式の実行ファイル中の .text セクションに含まれる命令を単純にカ
+  ウントしているだけである
+- ほとんどのプログラムは C 言語で書かれていて、オペレーティングシステ
+  ムのビルド時に特定の C コンパイラ (おそらく GCC バージョン 8) でコン
+  パイルされている
+
+このため、逆に考えれば以下のようにも言えます。
+- i386 版の Debian GNU/Linux 以外のオペレーティングシステムであればど
+  のような結果になるかはわからない
+- ELF 形式の実行ファイル中に含まれる命令をカウントしているだけであって、
+  それらの命令が実際にどのくらいの頻度で呼び出されるのかはわからない
+- したがって、プログラムの実行中に、実際に実行した命令をカウントしたら、
+  まったく異なるランキングになる可能性がある
+- 特定のバージョンの GCC が生成する機械語プログラムの特性を分析してい
+  るだけの可能性がある (コンパイラの種類やバージョンを変えれば結果が大
+  きく変わるかもしれない)
+#+end_note
+
+** 章末問題
+<<sec:x86regs/quiz>>
+
+1. IA-32 インテル(R) アーキテクチャー・ソフトウェア・デベロッパーズ・
+   マニュアル
+   \cite{Intel04:IA32J-1,Intel04:IA32J-2A,Intel04:IA32J-2B,Intel04:IA32J-3}
+   を入手せよ。
+   
+2. Intel(R) 64 and IA-32 Architectures Software Developer's Manual
+   \cite{Intel20:IA32} を入手せよ。
+   
+3. 文献 \cite{Intel04:IA32J-1} において、キャリーフラグ (CF) の役割が
+   説明されている箇所を特定して読んでみよ。
+
+   #+begin_answer
+   3.4.3.1. ステータスフラグ (3-16 ページ)
+   #+end_answer
+
+4. 表 [[tab:x86regs/ranking]] から好きな命令を一つ選び、文献
+   \cite{Intel04:IA32J-2A,Intel04:IA32J-2B} からその命令のリファレンス
+   を探して読んでみよ。リファレンスを読んで、わかったことと、わからな
+   かったことが何かを説明せよ。
+   

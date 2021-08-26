@@ -1,0 +1,58 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+#+title: @@latex:\huge\bf@@ モダン アセンブリ言語プログラミング
+#+author: @@latex:\large\bf@@ 大崎 博之
+#+date: {{{time(%Y/%m/%d %H:%M)}}} 版
+
+#+options: ':nil broken-links:mark
+
+#+latex_class: jsbook
+#+latex_class_options: [b5var,dvipdfmx]
+#+latex_header: \usepackage{cite}
+#+latex_header: \usepackage{jlisting}
+#+latex_header: \usepackage{palatino}
+#+latex_header: \usepackage{url}
+
+#+include: "00_macro.org"
+#+include: "01_intro.org"
+#+include: "02_asm.org"
+#+include: "04_number.org"
+#+include: "05_char.org"
+#+include: "06_cpu.org"
+#+include: "07_tr-regs.org"
+#+include: "08_mem.org"
+#+include: "09_tr-mem.org"
+#+include: "10_stack.org"
+#+include: "11_tr-stack.org"
+#+include: "12_gas.org"
+#+include: "13_inline.org"
+#+include: "14_x86regs.org"
+#+include: "15_x86trans.org"
+#+include: "16_x86arith.org"
+#+include: "17_x86ctrl.org"
+#+include: "18_x86fp.org"
+#+include: "19_x86simd.org"
+#+include: "20_comet.org"
+#+include: "21_avr.org"
+#+include: "22_arm.org"
+#+include: "23_x86-64.org"
+
+\renewcommand{\em}{\rm}
+\bibliographystyle{ieeetr}
+\bibliography{asm}

@@ -1,0 +1,1084 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* デバッガによるトレース: レジスタ
+<<ch:tr-regs>>
+
+** C 言語からアセンブリ言語へ
+<<sec:tr-regs/c-to-asm>>
+
+CPU が機械語のプログラムを実行するようすを実際に見てみましょう。
+以下の C 言語で書かれたプログラムをエディタから入力し、
+~add.c~ というファイル名で保存します。
+
+#+caption: tr-regs/add.c
+#+label: fig:tr-regs/add.c
+#+include: "code/tr-regs/add.c" src C
+
+このプログラム ~add.c~ は、
+ | ~i = 123~     | 変数 ~i~ に 123 を代入する           |
+ | ~i = i + 1~   | 変数 ~i~ に 1 を加える               |
+ | ~j = 456~     | 変数 ~j~ に 456 を代入する           |
+ | ~j = i + j~   | 変数 ~j~ に ~i + j~ を代入する       |
+ | ~return j~    | ~j~ を ~main~ 関数の返り値として返す |
+という処理を行っています。
+
+まず、
+~-S~ オプションを指定して GCC でコンパイルし、
+コンパイラがどのようなアセンブリ言語のプログラムに変換したかを見てみます。
+#+begin_src sh
+$ gcc -S -fno-pic -fomit-frame-pointer add.c
+#+end_src
+
+#+begin_note
+~-fno-pic~ オプションおよび ~-fomit-frame-pointer~ オプションの意味は [[sec:asm/c-to-machine]] 節を参照してください。
+#+end_note
+
+この結果、
+例えば以下のようなアセンブリ言語のプログラム ~add.s~ が生成されているはずです。
+
+#+caption: tr-regs/add.s
+#+label: fig:tr-regs/add.s
+#+include: "code/tr-regs/add.s" src asm
+
+#+begin_note
+C コンパイラが生成するアセンブリ言語のプログラムは、
+- コンピュータのアーキテクチャ
+- C コンパイラのバージョン
+- C コンパイラの構築時オプション
+- C コンパイルの起動時オプション
+などによって変化します。
+このため、
+皆さんが手元の環境で実行した場合は、
+上記のサンプルとは一部異なる (もしくは似ても似つかないほど異なる) 結果になるかもしれません。
+#+end_note
+
+まだアセンブリ言語の文法を説明していないので、
+何が書いてあるかはよくわからないかもしれませんが、
+細かいところはわからないままでかまいません。
+本章では、
+機械語のプログラムの実行によって、
+CPU のレジスタがどのように変化していくかだけがわかれば十分です。
+
+** C 言語とアセンブリ言語の対応分析
+<<sec:tr-regs/asm-matching>>
+
+ドット (~.~) から始まる命令は *アセンブラの疑似命令* であり、
+*ディレクティブ (directive)* とも呼ばれます。
+directive という単語は「正式な指令」という意味です。
+アセンブラの疑似命令は、
+CPU が実行する命令ではなく、
+プログラマからアセンブラへの指示です。
+例えば、
+#+begin_src asm
+        .text
+        .globl  main
+#+end_src
+というディレクティブは、
+「ここからプログラムの本体を始めよ」とか「シンボル ~main~ は他のプログラムから参照できるようにせよ」という指令です。
+また、
+行頭の ~.L~ から始まる名前は局所シンボル (local symbol) です。
+
+アセンブリ言語で書かれたプログラムの動作に着目するため、
+今はアセンブラの疑似命令や局所シンボルをすべて削除します。
+
+#+caption: tr-regs/add.ss
+#+label: fig:tr-regs/add.ss
+#+include: "code/tr-regs/add.ss" src asm
+
+11 行の短いプログラムになりました。
+これならなんとか理解できそうです。
+アセンブリ言語の命令の大半は、
+英語の動詞から名付けられています。
+ここで登場している命令の意味を簡単に紹介しておきましょう (表 [[tab:tr-regs/ops]])。
+
+#+caption: 5 種類の命令の意味
+#+label: tab:tr-regs/ops
+| 命令         | 意味                                                |
+|--------------+-----------------------------------------------------|
+| PUSH (push)  | データをプッシュする (一時保存する)                 |
+| MOV (move)   | データをコピーする                                  |
+| ADD (add)    | 数値を加算する                                      |
+| POP (pop)    | データをポップする (以前プッシュしたものを取り出す) |
+| RET (return) | 呼び出し元に戻る                                    |
+
+C 言語で書かれたプログラム ~add.c~ と、
+GCC の生成したアセンブリ言語のプログラム ~add.s~ をじっくり比較すると、
+以下のような対応になっていそうです。
+
+#+caption: ~add.c~ と ~add.s~ の対応
+#+label: fig:tr-regs/add.ss-with-note
+#+include: "code/tr-regs/add.ss-with-note" src asm
+
+[[sec:cpu/ia32-register]] 節で述べたように、
+IA-32 アーキテクチャの汎用レジスタは、
+EAX、
+EBX、
+ECX、
+EDX、
+ESI、
+EDI、
+EBP、
+ESP の 8 個でした。
+アセンブリ言語のプログラム中の、
+~%esi~、
+~%ebx~、
+~%eax~ が、
+それぞれレジスタ ESI、
+EBX、
+EAX に対応していそうです。
+
+また、
+変数 ~i~ がレジスタ ESI に対応し、
+変数 ~j~ がレジスタ EBX に対応していそうです。
+また、
+関数の返り値はレジスタ EAX に格納していそう、
+ということがわかります。
+
+C 言語で書かれたプログラム ~add.c~ に対応させて、
+アセンブリ言語のプログラム ~add.s~ を解釈すると、
+以下のような処理を行っていることがわかります。
+
+#+attr_latex: :environment maxtabular
+| ~i = 123~     | ~movl	$123, %esi~ | レジスタ ESI に 123 を代入する               |
+| ~i = i + 1~   | ~addl	$1, %esi~   | レジスタ ESI に 1 を加える                   |
+| ~j = 456~     | ~movl	$456, %ebx~ | レジスタ EBX に 456 を代入する               |
+| ~j = i + j~   | ~addl	%esi, %ebx~ | レジスタ EBX に、レジスタ ESI の値を加える   |
+| ~return j;~   | ~movl	%ebx, %eax~ | レジスタ EBX の値をレジスタ EAX にコピーする |
+
+このプログラムを実際に実行すると、
+CPU の制御装置が機械語のプログラムを先頭から順番に解釈し、
+レジスタの値を操作したり、
+ALU に指示を出したりして計算を行います。
+ALU は、
+制御装置から指示を受けて、
+「レジスタ←レジスタの値 + 定数」や「レジスタ←レジスタの値 + レジスタの値」などの演算を行います。
+
+レジスタの値も計算に応じて変化します (表 [[tab:tr-regs/reg-change]])。
+レジスタ ESI の値は、
+まず 123 になり、
+その後 +1 されて 124 になるはずです。
+レジスタ EBX の値は、
+まず 456 になり、
+その後 580 (= 124 + 456) になるはずです。
+最後に、
+レジスタ EAX の値が 580 になるはずです。
+
+#+caption: レジスタの値の変化
+#+label: tab:tr-regs/reg-change
+#+attr_latex: :environment maxtabular
+| 命令                     | 意味                                         | EAXの値 | EBXの値 | ESIの値 |
+|--------------------------+----------------------------------------------+---------+---------+---------|
+| ~movl	$123, %esi~ | レジスタ ESI に 123 を代入する               | 不明    | 不明    | 123     |
+| ~addl	$1, %esi~   | レジスタ ESI に 1 を加える                   | ↓      | ↓      | 124     |
+| ~movl	$456, %ebx~ | レジスタ EBX に 456 を代入する               | ↓      | 456     | ↓      |
+| ~addl	%esi, %ebx~ | レジスタ EBX に、レジスタ ESI の値を加える   | ↓      | 580     | ↓      |
+| ~movl	%ebx, %eax~ | レジスタ EBX の値をレジスタ EAX にコピーする | 580     | ↓      | ↓      |
+
+** デバッガの監視下でのプログラムの起動
+<<sec:tr-regs/dbg>>
+
+本当にそのように動作するのか、
+デバッガを用いて CPU の内部動作を見てみましょう。
+*デバッガ (debugger)* とは、
+ソフトウェアのデバッグを支援するためのツールであり、
+デバッガの監視下で、
+デバッグしたいプログラムを実行できます。
+デバッガを使えば、
+プログラムの内部動作を分析できるのですが、
+ここではまず、
+CPU の内部動作を理解するために使っていきます。
+
+先ほどの C 言語で書かれたプログラム ~add.c~ をコンパイルして、
+実行ファイル ~add~ を生成します。
+#+begin_src sh
+$ gcc -fno-pic -fomit-frame-pointer -o add add.c
+#+end_src
+
+本書では *GDB (GNU Debugger)* と呼ばれるデバッガを使用します。
+現在の作業ディレクトリに、
+以下の内容を書いたファイル ~.gdbinit~ を作成しておいてください。
+~.gdbinit~ は GDB の初期化ファイルで、
+GDB 起動時に自動的に読み込まれます。
+
+#+caption: tr-regs/.gdbinit
+#+label: fig:tr-regs/.gdbinit
+#+include: "code/tr-regs/.gdbinit" src gdb
+
+実行ファイル名 ~ex~ を指定して、
+デバッガ ~gdb~ を起動します。
+#+begin_src gdb
+$ gdb -q ex
+Reading symbols from add...
+(No debugging symbols found in add)
+Breakpoint 1 at 0x1189
+(gdb) 
+#+end_src
+GDB 起動時のメッセージ表示を抑制するため、
+~-q~ オプションを指定しています。
+
+#+begin_note
+~gdb~ コマンドを起動すると、
+以下のような、
+「セキュリティ保護のため ~.gdbinit~ ファイルを読み込まなかった」という警告が表示されるかもしれません。
+#+begin_src gdb
+warning: File "/home/asm/code/tr-regs/.gdbinit" auto-loading has been declined by your `auto-load safe-path' se\
+t to "$debugdir:$datadir/auto-load".
+To enable execution of this file add
+        add-auto-load-safe-path /home/asm/code/tr-regs/.gdbinit
+line to your configuration file "/home/asm/.gdbinit".
+To completely disable this security protection add
+        set auto-load safe-path /
+line to your configuration file "/home/asm/.gdbinit".
+For more information about this security protection see the
+"Auto-loading safe path" section in the GDB manual.  E.g., run from the shell:
+        info "(gdb)Auto-loading safe path"
+#+end_src
+
+その場合は、
+警告メッセージに書かれているとおりに、
+ホームディレクトリ上の ~.gdbinit~ ファイルに
+#+begin_src raw
+set auto-load safe-path /
+#+end_src
+という 1 行を記載してください (ファイルがない場合は新規に作成してください)
+#+end_note
+
+~(gdb)~ がデバッガのプロンプトです。
+ここからコマンドを入力することによってデバッガに指示を出します。
+
+~gdb~ コマンドを終了するには q コマンドを実行します。
+~gdb~ コマンドのヘルプ (正確にはヘルプのヘルプ) は h コマンドで表示されます。
+#+begin_src gdb
+(gdb) h
+List of classes of commands:
+
+aliases -- User-defined aliases of other commands.
+breakpoints -- Making program stop at certain points.
+data -- Examining data.
+files -- Specifying and examining files.
+internals -- Maintenance commands.
+obscure -- Obscure features.
+running -- Running the program.
+stack -- Examining the stack.
+status -- Status inquiries.
+support -- Support facilities.
+text-user-interface -- TUI is the GDB text based interface.
+tracepoints -- Tracing of program execution without stopping the program.
+user-defined -- User-defined commands.
+
+Type "help" followed by a class name for a list of commands in that class.
+Type "help all" for the list of all commands.
+Type "help" followed by command name for full documentation.
+Type "apropos word" to search for commands related to "word".
+Type "apropos -v word" for full documentation of commands related to "word".
+Command name abbreviations are allowed if unambiguous.
+#+end_src
+
+先ほど用意した ~.gdbinit~ ファイルは、
+デバッガの起動時に読み込まれる初期化ファイルです。
+例えば、
+#+begin_src gdb
+break main
+#+end_src
+という記述により、
+関数 ~main~ に *ブレークポイント (実行停止ポイント)* を指定しています。
+これによって、
+関数 ~main~ の処理を実行しようとした瞬間にデバッガが一時停止します。
+その下の
+#+begin_src gdb
+display /x $eax
+display /x $ebx
+display /x $esi
+#+end_src
+は、
+レジスタ EAX、
+EBX、
+ESI の値を、
+*16 進数表記で表示* するように指示しています。
+これにより、
+機械語の命令を 1 つずつ実行するにつれて、
+レジスタの値がどのように変化するかを追いかけられます。
+そして最後の
+#+begin_src gdb
+display /4i $pc
+#+end_src
+は、
+プログラムカウンタ (命令ポインタレジスタ) が差すアドレスから 4 命令 (次に実行される機械語 4 命令) を *逆アセンブル* するように指示しています。
+これにより、
+これから実行する機械語の命令が、
+アセンブリ言語で書かれたプログラムのどこに対応しているかがわかります。
+
+** プログラムの実行開始とブレークポイントでの停止
+<<sec:tr-regs/dbg-run>>
+
+では、
+プログラム ~add~ をデバッガの監視下で実行しましょう。
+r (*run コマンド* の省略形) と入力して、
+リターンキーを押します。
+#+begin_src gdb
+(gdb) r
+Starting program: /home/ohsaki/code/tr-regs/add 
+
+Breakpoint 1, 0x56556189 in main ()
+1: /x $eax = 0xf7fc2ae8 ← レジスタ EAX の値
+2: /x $ebx = 0x0	← レジスタ EBX の値
+3: /x $esi = 0xf7fc0000	← レジスタ ESI の値
+4: x/4i $pc
+=> 0x56556189 <main>:   push   %esi
+   0x5655618a <main+1>: push   %ebx
+   0x5655618b <main+2>: mov    $0x7b,%esi
+   0x56556190 <main+7>: add    $0x1,%esi
+(gdb)
+#+end_src
+プログラムの実行がブレークポイント (関数 ~main~ に入った直後) で停止します (図 [[fig:tr-regs/add-1]])。
+
+#+begin_note
+プログラムが配置されるアドレス (上の例では関数 ~main~ の 0x5655 6189) はオペレーティングシステムの種類やバージョンなどさまざまな要因によって変化します。
+#+end_note
+
+#+caption: ブレークポイント (関数 ~main~ に入った直後) で停止した状態
+#+label: fig:tr-regs/add-1
+[[./figure/tr-regs/add-1.png]]
+
+~$pc~、
+~$eax~、
+~$ebx~、
+~$esi~ が、
+それぞれプログラムカウンタ、
+レジスタ EAX、
+EBX、
+ESI に対応しています。
+アセンブリ言語では、
+~%eax~ のようにレジスタ名の先頭に ~%~ が付いていました。
+デバッガの出力では、
+~$eax~ のようにレジスタ名の先頭に ~$~ が付いています。
+
+~.gdbinit~ ファイルで設定しておいたため、
+いくつかの情報が表示されています。
+まず、
+#+begin_src gdb
+Breakpoint 1, 0x56556189 in main ()
+#+end_src
+は、
+1 つ目のブレークポイント (アドレスは 0x5655 6189) でプログラムの実行が停止したことを表しています。
+次の
+#+begin_src gdb
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x0
+3: /x $esi = 0xf7fc0000
+#+end_src
+には、
+現在のレジスタ EAX、
+EBX、
+ESI の値が 16 進数で表示されています。
+レジスタ EBX の値は 0 ですが、
+レジスタ EAX と ESI は大きな値であることがわかります。
+その下の
+#+begin_src gdb
+4: x/4i $pc
+=> 0x56556189 <main>:   push   %esi ← 次に実行される命令
+   0x5655618a <main+1>: push   %ebx
+   0x5655618b <main+2>: mov    $0x7b,%esi
+   0x56556190 <main+7>: add    $0x1,%esi
+#+end_src
+は、
+現在のプログラムカウンタから 4 命令分を逆アセンブルした結果です。
+行頭の ~=>~ は現在のプログラムカウンタの場所を表しています。
+これから、
+現在のプログラムカウンタの値が 0x5655 6189 番地であること、
+0x5655 6189 番地は関数 ~main~ の開始番地であること、
+次に実行される命令は ~push %esi~ であること、
+などがわかります。
+
+** デバッガによるプログラムの内部状態の確認・変更
+<<sec:tr-regs/dbg-change>>
+
+この状態でさらに、
+レジスタの値を表示したり、
+変更したり、
+メモリの内容を表示したり、
+変更したりすることができます。
+いくつか例を示しましょう。
+
+プログラムカウンタ (レジスタ EIP) の値を表示します。
+なお、
+p は *print コマンド* の省略形です。
+
+#+begin_src gdb
+(gdb) p $pc
+$1 = (void (*)()) 0x56556189 <main>
+#+end_src
+
+レジスタ ECX の値を表示します。
+標準では符号付き整数として表示されます。
+#+begin_src gdb
+(gdb) p $ecx ← レジスタ ECX の値を 10 進数で表示
+$2 = -1699431775
+#+end_src
+
+レジスタ ECX の値を 16 進数で表示します。
+/x で出力フォーマットを 16 進数に指定しています。
+#+begin_src gdb
+(gdb) p/x $ecx ← レジスタ ECX の値を 16 進数で表示
+$3 = 0x9ab4baa1
+#+end_src
+
+同じように、
+レジスタ ECX の値を 8 進数と 2 進数で表示します。
+/o および /t で、
+それぞれ出力フォーマットを 8 進数および 2 進数に指定しています。
+#+begin_src gdb
+(gdb) p/o $ecx ← レジスタ ECX の値を 8 進数で表示
+$4 = 023255135241
+(gdb) p/t $ecx ← レジスタ ECX の値を 2 進数で表示
+$5 = 10011010101101001011101010100001
+#+end_src
+
+デバッガはプログラムをテストするためのツールであり、
+もっと恐ろしいこともできます。
+一例として、
+レジスタ EAX の値を 123 で上書きしてみましょう。
+#+begin_src gdb
+(gdb) set $eax=123 ← レジスタ EAX に 123 を格納
+(gdb) p $eax
+$6 = 123           ← レジスタ EAX の値が 123 に変化している
+#+end_src
+ここでは、
+set コマンドを使用して、
+レジスタ EAX の値を 123 に書き換えています。
+当然ですが、
+プログラムの実行中に不用意にレジスタの値を書き換えると、
+プログラムが誤動しますので注意してください。
+
+また、
+レジスタだけでなく、
+実行中のプログラムのメモリも書き換えることができます。
+
+レジスタ ESP の値を表示させ、
+スタックの一番上のアドレスを確認してみましょう。
+#+begin_src gdb
+(gdb) p/x $esp ← レジスタ ESP の値を 16 進数で表示
+$7 = 0xffffd4ec
+#+end_src
+現在、
+スタックの一番上は 0xffff d4ec 番地であることがわかります。
+
+ここで、
+スタックの上位 64 バイトを 16 進数でダンプします。
+*x コマンド* はメモリの内容を表示するコマンドで、
+/64b は「バイト単位で 64 個分表示する」ことを指示しています。
+#+begin_src gdb
+(gdb) x/64b $esp ↓ スタックの一番上は 32 ビットアドレスの 0xffffd4ec
+0xffffd4ec:     0x46    0x9e    0xdf    0xf7    0x01    0x00    0x00    0x00
+0xffffd4f4:     0x94    0xd5    0xff    0xff    0x9c    0xd5    0xff    0xff
+0xffffd4fc:     0x24    0xd5    0xff    0xff    0x34    0xd5    0xff    0xff
+0xffffd504:     0x40    0xdb    0xff    0xf7    0x20    0xa4    0xfc    0xf7
+0xffffd50c:     0x00    0x00    0xfc    0xf7    0x01    0x00    0x00    0x00
+0xffffd514:     0x00    0x00    0x00    0x00    0x78    0xd5    0xff    0xff
+0xffffd51c:     0x00    0x00    0x00    0x00    0x00    0xd0    0xff    0xf7
+0xffffd524:     0x00    0x00    0x00    0x00    0x00    0x00    0xfc    0xf7
+#+end_src
+
+スタックの一番上の 4 バイトを、
+32 ビットの符号付き整数の 0 で上書きします。
+#+begin_src gdb
+(gdb) set *(0xffffd4ec) = 0
+(gdb) x/64b $esp ↓ スタックの一番上の 4 バイトが 0 になった
+0xffffd4ec:     0x00    0x00    0x00    0x00    0x01    0x00    0x00    0x00
+0xffffd4f4:     0x94    0xd5    0xff    0xff    0x9c    0xd5    0xff    0xff
+0xffffd4fc:     0x24    0xd5    0xff    0xff    0x34    0xd5    0xff    0xff
+0xffffd504:     0x40    0xdb    0xff    0xf7    0x20    0xa4    0xfc    0xf7
+0xffffd50c:     0x00    0x00    0xfc    0xf7    0x01    0x00    0x00    0x00
+0xffffd514:     0x00    0x00    0x00    0x00    0x78    0xd5    0xff    0xff
+0xffffd51c:     0x00    0x00    0x00    0x00    0x00    0xd0    0xff    0xf7
+0xffffd524:     0x00    0x00    0x00    0x00    0x00    0x00    0xfc    0xf7
+#+end_src
+
+無事、
+スタックの中身が破壊されました ! スタックの一番上に積まれていたリターンアドレスを上書きすることができました。
+
+一時停止を抜けて、
+プログラムの実行を継続します。
+プログラムの実行を継続するには *continue コマンド* (省略形は c) を使います。
+#+begin_src gdb
+(gdb) c ← プログラムの実行を継続 (continue)
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00000000 in ?? ()
+1: /x $eax = 0x244
+2: /x $ebx = 0x0
+3: /x $esi = 0xf7fc0000
+4: x/4i $pc
+=> 0x0: <error: Cannot access memory at address 0x0>
+#+end_src
+
+先ほどスタックを破壊したので、
+*不正なメモリアクセス (セグメント違反)* でプログラムが停止しました。
+0x0000 0000 番地のプログラムを実行しようとしましたが、
+0x0000 0000 番地へのアクセス権限がないため例外が発生していることがわかります。
+
+メモリの内容を書き換えたので、
+いったんデバッガを終了しましょう。
+q コマンドでデバッガを終了します。
+#+begin_src gdb
+(gdb) q ← quit コマンドでデバッガを終了
+#+end_src
+
+** デバッガにおける一命令単位のステップ実行
+<<sec:tr-regs/dbg-step>>
+
+再度デバッガの監視下で実行ファイル ~add~ を起動し、
+r コマンドで実行を開始します。
+#+begin_src gdb
+$ gdb -q add
+Reading symbols from add...
+(No debugging symbols found in add)
+Breakpoint 1 at 0x1189
+(gdb) r ← run コマンドでプログラムの実行を開始
+Starting program: /home/asm/code/tr-regs/add
+
+Breakpoint 1, 0x56556189 in main () ← ブレークポイントで停止した
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x0
+3: /x $esi = 0xf7fc0000
+4: x/4i $pc
+=> 0x56556189 <main>:   push   %esi
+   0x5655618a <main+1>: push   %ebx
+   0x5655618b <main+2>: mov    $0x7b,%esi
+   0x56556190 <main+7>: add    $0x1,%esi
+(gdb) 
+#+end_src
+
+si コマンドを実行すれば、
+デバッガの監視下で 1 命令ずつ実行できます。
+正確なコマンド名としては *stepi* (1 命令を実行する) ですが、
+ここでは省略形の si を用いています。
+
+GDB のプロンプトで何も入力せずにリターンキーを押せば、
+直前に実行したコマンドが繰り返されます。
+このため、
+繰り返し si コマンドを実行する場合は、
+2 回目以降はリターンキーを押すだけです。
+
+それでは早速、
+2 命令ほどステップ実行してみましょう (図 [[fig:tr-regs/add-2]])。
+
+#+caption: 2 命令ステップ実行した状態
+#+label: fig:tr-regs/add-2
+[[./figure/tr-regs/add-2.png]]
+
+#+begin_src gdb
+(gdb) si ← stepi コマンドで一命令ずつ実行する
+0x5655618a in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x0
+3: /x $esi = 0xf7fc0000
+4: x/4i $pc
+=> 0x5655618a <main+1>: push   %ebx
+   0x5655618b <main+2>: mov    $0x7b,%esi
+   0x56556190 <main+7>: add    $0x1,%esi
+   0x56556193 <main+10>:        mov    $0x1c8,%ebx
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x5655618b in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x0
+3: /x $esi = 0xf7fc0000	← 実行前のレジスタ ESI の値
+4: x/4i $pc
+=> 0x5655618b <main+2>: mov    $0x7b,%esi
+   0x56556190 <main+7>: add    $0x1,%esi
+   0x56556193 <main+10>:        mov    $0x1c8,%ebx
+   0x56556198 <main+15>:        add    %esi,%ebx
+(gdb) 
+#+end_src
+
+** レジスタの値の変化を追跡する
+<<sec:tr-regs/trace-regs>>
+
+ここからが本題です。
+先ほど説明したように、
+表 [[tab:tr-regs/reg-change]] のように動作するか、
+実際に目で見てみましょう。
+
+さらにリターンキーを押し、
+\inst{mov $0x7b,%esi} という命令を実行します (図 [[fig:tr-regs/add-3]])。
+0x7b は 10 進数で 123 であることに注意します。
+
+#+caption: ~movl $123, %esi~ を実行した直後の状態
+#+label: fig:tr-regs/add-3
+[[./figure/tr-regs/add-3.png]]
+
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x56556190 in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x0
+3: /x $esi = 0x7b ← mov 命令実行後に 0x7b に変化した
+4: x/4i $pc
+=> 0x56556190 <main+7>: add    $0x1,%esi  ← レジスタ ESI に 1 を追加
+   0x56556193 <main+10>:        mov    $0x1c8,%ebx
+   0x56556198 <main+15>:        add    %esi,%ebx
+   0x5655619a <main+17>:        mov    %ebx,%eax
+(gdb) 
+#+end_src
+レジスタ ESI の値 (~$esi~) が、
+よくわからない値 (0xf7fc 0000) から 0x7b に変化しています。
+制御装置が 1 命令分だけ動作して、
+レジスタ ESI の値が書き換えられました。
+
+もう一命令実行しましょう。
+\inst{add $0x1,%esi} が実行され、
+レジスタ ESI の値が 1 だけ増えるはずです (図 [[fig:tr-regs/add-4]])。
+
+#+caption: 命令 ~add $0x1,%esi~ 実行直後の状態
+#+label: fig:tr-regs/add-4
+[[./figure/tr-regs/add-4.png]]
+
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x56556193 in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x0
+3: /x $esi = 0x7c ← add 命令実行後に 1 増加した
+4: x/4i $pc
+=> 0x56556193 <main+10>:        mov    $0x1c8,%ebx ← 0x1c8 は 10 進数で 456
+   0x56556198 <main+15>:        add    %esi,%ebx
+   0x5655619a <main+17>:        mov    %ebx,%eax
+   0x5655619c <main+19>:        pop    %ebx
+(gdb) 
+#+end_src
+レジスタ ESI の値 (~$esi~) が、
+0x7b から 0x7c に増加していることがわかります。
+やはり、
+制御装置が 1 命令分だけ動作して、
+ALU に算術演算を指示し、
+レジスタ ESI の値が書き換えられました。
+
+si コマンドを続けて実行しましょう。
+\inst{mov $0x1c8,%ebx} を実行します (図 [[fig:tr-regs/add-5]])。
+
+#+caption: 命令 ~mov $0x1c8,%ebx~ 実行直後の状態
+#+label: fig:tr-regs/add-5
+[[./figure/tr-regs/add-5.png]]
+
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x56556198 in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $ebx = 0x1c8 ← レジスタ EBX が 0x1c8 (= 456) になった   
+3: /x $esi = 0x7c  ← add 命令実行前のレジスタ ESI の値 (= 124)
+4: x/4i $pc
+=> 0x56556198 <main+15>:        add    %esi,%ebx ← レジスタ EBX にレジスタ ESI の値を追加
+   0x5655619a <main+17>:        mov    %ebx,%eax
+   0x5655619c <main+19>:        pop    %ebx
+   0x5655619d <main+20>:        pop    %esi
+(gdb)
+#+end_src
+レジスタ EBX の値が 0x1c8 (= 456) になりました。
+
+次に実行される命令は \inst{add %esi,%ebx} です。
+レジスタ ESI の値が 0x7c (= 124) なので、
+レジスタ EBX に 124 が追加されるはずです (図 [[fig:tr-regs/add-6]])。
+
+#+caption: 命令 ~add %esi,%ebx~  実行直後の状態
+#+label: fig:tr-regs/add-6
+[[./figure/tr-regs/add-6.png]]
+
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x5655619a in main ()
+1: /x $eax = 0xf7fc2ae8 ← mov 命令実行前のレジスタ EAX の値		   
+2: /x $ebx = 0x244 	← レジスタ EBX の値が増えて 0x244 (= 580) になった
+3: /x $esi = 0x7c
+4: x/4i $pc
+=> 0x5655619a <main+17>:        mov    %ebx,%eax
+   0x5655619c <main+19>:        pop    %ebx
+   0x5655619d <main+20>:        pop    %esi
+   0x5655619e <main+21>:        ret    
+(gdb) 
+#+end_src
+レジスタ EBX の値が 124 増えて、
+580 になりました。
+
+現在、
+レジスタ EAX の値は 0xf7fc 2ae8 というよくわからない値ですが、
+次の命令は \inst{mov %ebx,%eax} です。
+レジスタ EBX の値が、
+レジスタ EAX にコピーされるはずです (図 [[fig:tr-regs/add-7]])。
+
+#+caption: 命令 ~mov %ebx,%eax~ 実行直後の状態
+#+label: fig:tr-regs/add-7
+[[./figure/tr-regs/add-7.png]]
+
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x5655619c in main ()
+1: /x $eax = 0x244 ← レジスタ EBX の値がレジスタ EAX にコピーされた
+2: /x $ebx = 0x244
+3: /x $esi = 0x7c
+4: x/4i $pc
+=> 0x5655619c <main+19>:        pop    %ebx
+   0x5655619d <main+20>:        pop    %esi
+   0x5655619e <main+21>:        ret    
+   0x5655619f:  nop
+(gdb) 
+#+end_src
+レジスタ EAX の値が、
+レジスタ EBX の値と同じ 0x244 (= 580) に変化しました。
+
+プログラム ~add.c~ は、
+123 + 1 + 456 = 580 を計算するだけの単純なプログラムですが、
+C 言語のプログラムがどのように機械語に変換されるのか、
+また、
+機械語の単純な命令の組み合わせてによって計算が実現されているのかがわかります。
+
+** GDB の端末インターフェース (TUI モード)
+<<sec:tr-regs/gdb-tui>>
+
+ここまで、
+GDB を用いて、
+プログラムの動作をトレースする方法を説明しました。
+GDB のプロンプトに、
+run コマンドや、
+stepi コマンド、
+print コマンドなどを入力しました。
+これにより、
+デバッガの監視下で、
+プログラムを機械語の命令単位でステップ実行したり、
+コンピュータの内部状態を観測したりしました。
+
+GDB は、
+例に示したような *CLI (Command Line Interface; コマンドライン・インターフェース)* の他にも、
+*CUI (Character User Interface; キャラクタ・ユーザインターフェース)* によって操作することもできます。
+
+GDB を CLI で操作する場合には、
+GDB のプロンプトに対してコマンドを入力します。
+GDB からの出力はそのつど画面に表示され、
+多くの情報が出力される場合は画面がスクロールします。
+このため、
+端末エミュレータの画面をスクロールバックすることにより、
+GDB がこれまでにどのような情報を出力したかを確認することができます。
+
+本書では、
+基本的に GDB を CLI で操作し、
+そのときの GDB の出力を確認することによってプログラムのトレースを行います。
+これ以降の章でも、
+GDB を CLI で操作します。
+
+ただし、
+GDB は *TUI (Text User Interface; テキスト・インターフェース)* と呼ばれる CUI ベースの端末インターフェース (図 [[fig:gdb-tui-src]]) によって操作することもできます。
+
+#+caption: GDB の TUI (Text User インターフェース) モード
+#+label: fig:gdb-tui-src
+[[./figure/tr-regs/gdb-tui-src.png]]
+
+GDB の TUI モードは、
+*curses と呼ばれる画面制御ライブラリ* によって実装された対話型の端末インターフェースです。
+GUI (Graphical User Interface; グラフィカル・ユーザインターフェース) ではなく CUI です。
+グラフィックではなく、
+端末エミュレータの画面上で動作する、
+あくまで文字のみのインターフェースです。
+
+GDB の TUI モードでは、
+画面上に、
+*文字ベースの複数のウィンドウ* を表示し、
+それぞれのウィンドウに、
+プログラムのソースコード、
+逆アセンブル結果、
+レジスタの一覧、
+GDB のコマンドプロンプトを表示できます。
+
+図 [[fig:gdb-tui-src]] では、
+C 言語で書かれたプログラム ~add.c~ ([[sec:tr-regs/c-to-asm]] 節の図 [[fig:tr-regs/add.c]]) をコンパイルし、
+GDB の TUI モードでトレースしています。
+関数 ~main~ にブレークポイントを設定して、
+プログラムの実行を一時停止しています。
+画面上部のウィンドウには、
+実行中のプログラムのソースコード (今の場合、
+~add.c~) が表示されています。
+
+1 番目のカラムの「~B+~」はブレークポイントの位置と状態を示しています。
+例えば、
+「~B+~」の「~B~」は到達したブレークポイントであること、
+「~+~」はブレークポイントが有効であることを意味しています。
+
+3 番目のカラムの「~>~」は現在のプログラムカウンタの値が、
+C 言語で書かれたプログラムのどこに対応するかを示しています。
+また、
+対応する行が反転して (ハイライトされて) 表示されています。
+
+画面下部のウィンドウには、
+GDB のコマンドプロンプトが表示されています。
+
+本書では GDB の TUI モードの基本的な使い方のみを説明します。
+TUI モードの詳細については、
+GDB のドキュメント /(gdb)TUI/ を参照してください。
+
+**** TUI モードを有効にする
+
+GDB の TUI モードを有効にするにはいくつかの方法があります。
+
+1. ~gdb~ コマンドの起動時オプションとして ~-tui~ を指定する
+
+  ~gdb~ コマンドの起動時にオプション ~-tui~ を指定すれば、
+  最初から TUI モードで起動します (図 [[fig:gdb-tui-src]])。
+  実行例を示します。
+  #+begin_src sh
+  $ gdb -tui add
+  #+end_src
+  
+2. GDB のコマンドプロンプトで C-x C-a を押す
+
+  GDB を通常の CLI モードで起動した後 (図 [[fig:gdb-tui-cli]]) でも、
+  ある特定のキーボード操作によって TUI モードの有効/無効を切り替えることができます。
+  
+#+caption: GDB を通常の CLI モードで起動した状態
+#+label: fig:gdb-tui-cli
+[[./figure/tr-regs/gdb-tui-cli.png]]
+
+  GDB のコマンドプロンプトで、
+  C-x C-a (または C-x a、
+  C-x A) を押すと TUI モードの有効/無効が切り替わります (図 [[fig:gdb-tui-src]])。
+  CLI モードのときは TUI モードに切り替わります。
+  TUI モードのときは CLI モードに戻ります。
+
+  GDB の起動後に TUI モードに切り替えたくなったときは、
+  C-x C-a によって切り替えるのが簡単です。
+
+3. GDB のコマンドプロンプトで tui コマンドを実行する
+
+  GDB のコマンドプロンプトで
+  #+begin_src raw
+  (gdb) tui enable
+  #+end_src
+  を実行すれば TUI モードが有効になります。
+  
+  同様に、
+  #+begin_src raw
+  (gdb) tui disable
+  #+end_src
+  を実行すれば TUI モードが無効になります (CLI モードに戻ります)。
+  
+  これは通常の GDB コマンドと同じです。
+  このため、
+  例えば ~.gdbinit~ ファイルに「tui enable」と書いておけば、
+  GDB の起動時に自動的に TUI モードが有効になります。
+
+TUI モードを有効にすると、
+図 [[fig:gdb-tui-src]] のように、
+2 つのウィンドウに *ソースコードと GDB のコマンドプロンプト* が表示されます。
+通常のソースコードレベルでのデバッグでは、
+このようなウィンドウ配置が便利です。
+
+一方、
+本書で扱っているような、
+機械語レベルでの命令の動作や、
+コンピュータのレジスタの値の変化をトレースする場合には、
+TUI モードの画面レイアウトを変更すると便利です。
+
+画面のレイアウトを切り替えるには、
+GDB の layout コマンドを使用します (図 [[fig:gdb-tui-asm]])。
+#+begin_src raw
+(gdb) layout asm
+#+end_src
+これにより、
+画面上部のウィンドウに逆アセンブル結果 (現在のプログラムカウンタ周辺の機械語プログラムの逆アセンブル結果) が表示されます。
+
+#+caption: TUI モードで layout asm を実行した状態
+#+label: fig:gdb-tui-asm
+[[./figure/tr-regs/gdb-tui-asm.png]]
+
+さらに、レジスタの値もあわせて表示するには
+#+begin_src raw
+(gdb) layout regs
+#+end_src
+を実行します (図 [[fig:gdb-tui-regs]])。
+画面上部のウィンドウが上下に分割され、
+上のウィンドウにレジスタの値の一覧が、
+下のウィンドウに逆アセンブル結果が表示されます。
+
+#+caption: TUI モードで layout regs を実行した状態
+#+label: fig:gdb-tui-regs
+[[./figure/tr-regs/gdb-tui-regs.png]]
+
+layout コマンドの挙動は一見するとわかりづらいかもしれませんが、
+以下のように動作します。
+
+#+attr_latex: :environment maxtabular
+| コマンド    | ウィンドウの数 | ウィンドウの配置                                                  |
+|-------------+----------------+-------------------------------------------------------------------|
+| layout src  |              2 | ソースコード + コマンドウィンドウ                                 |
+| layout asm  |              2 | 逆アセンブル結果 + コマンドウィンドウ                             |
+| layout regs |              3 | レジスタ一覧 + ソースコード/逆アセンブル結果 + コマンドウィンドウ |
+
+つまり、
+layout src や layout asm は、
+「ソースコードを表示するか、
+もしくは逆アセンブル結果を表示するか」を切り替えます。
+layout regs は、
+画面上部のウィンドウを分割して、
+レジスタの一覧をあわせて表示します。
+
+ウィンドウのレイアウトはキーボード操作によって変更することもできます。
+特に便利なのは C-x 2 です。
+C-x 2 を押すと、
+ウィンドウを分割したレイアウトが順番に切り替わります。
+TUI モードが有効になっていない (CLI モードで動作している) 場合も、
+*C-x 2 を押せば TUI モードが有効* になります。
+
+#+caption: C-x 2 による画面レイアウトの切り替え
+[[./figure/tr-regs/gdb-tui-cx2-1.png]]
+[[./figure/tr-regs/gdb-tui-cx2-2.png]]
+[[./figure/tr-regs/gdb-tui-cx2-3.png]]
+[[./figure/tr-regs/gdb-tui-cx2-4.png]]
+[[./figure/tr-regs/gdb-tui-cx2-5.png]]
+
+したがって、
+以下のような使い方がおすすめです。
+- GDB は普段どおりに CLI モードで起動する
+- TUI モードを使いたくなったら C-x 2 を押す
+- 好みのウィンドウのレイアウトになるまで C-x 2 を繰り返して押す
+- CLI モードに戻りたくなったら、C-x C-a で TUI モードを抜ける
+
+なお、
+TUI モードでは、
+アクティブウィンドウ (周囲がハイライトされているウィンドウ) の表示内容を、
+カーソルキーや PgUp/PgDn キーでスクロールさせることができます。
+アクティブウィンドウは、
+C-x o によって切り替えることができます。
+
+この場合、
+GDB のコマンドプロンプトの編集やヒストリ参照にはカーソルキーが使えません。
+したがって、
+TUI モードでは
+- ソースコードか逆アセンブル結果のウィンドウをアクティブにしておく
+- ソースコード/逆アセンブル結果のスクロールにはカーソルキーを使う
+- コマンドプロンプトの編集やヒストリ参照には C-f、C-b、C-n、C-p を使う
+という使い方がおすすめです。
+
+GDB を、
+通常の CLI モードで操作するほうがよいのか、
+TUI モードで操作するほうがよいのかは、
+プログラムをどのようにデバッグしたいのかによります。
+前述のように、
+C-x 2 や C-x C-a で TUI モードを切り替えられますので、
+デバッグの目的に応じて使い分けるのがよいでしょう。
+
+TUI モードには、
+*単一キーモード (single key mode)* と呼ばれる動作モードもあります。
+単一キーモードでは、
+r キーを押せば run コマンドが実行され、
+i キーを押せば stepi コマンドが実行されます。
+単一キーモードの詳細については GDB のドキュメント /(gdb)TUI Single Key Mode/ を参照してください。
+
+GDB は UNIX 系のオペレーティングシステム上で広く利用されているデバッガであり、
+GDB 標準のインターフェース以外にも多数のフロントエンドが利用できます。
+GDB は、
+MI (Machine Interface) と呼ばれるインターフェースをサポートしており、
+他のソフトウェアのバックエンドとして動作できるように設計されています。
+GDB を、
+MI インターフェースを有効にして起動すると、
+例えば以下のように、
+他のソフトウェアから操作しやすい形でコマンドの入出力を行います。
+#+begin_src raw
+$ gdb -ui=mi add
+=thread-group-added,id="i1"
+~"GNU gdb (Debian 10.1-1.7) 10.1.90.20210103-git\n"
+~"Copyright (C) 2021 Free Software Foundation, Inc.\n"
+~"License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law."
+~"\nType \"show copying\" and \"show warranty\" for details.\n"
+~"This GDB was configured as \"x86_64-linux-gnu\".\n"
+~"Type \"show configuration\" for configuration details.\n"
+~"For bug reporting instructions, please see:\n"
+~"<https://www.gnu.org/software/gdb/bugs/>.\n"
+~"Find the GDB manual and other documentation resources online at:\n    <http://www.gnu.org/software/gdb/documentation/>."
+~"\n\n"
+~"For help, type \"help\".\n"
+~"Type \"apropos word\" to search for commands related to \"word\"...\n"
+=cmd-param-changed,param="auto-load safe-path",value="/"
+~"Reading symbols from add...\n"
+=breakpoint-created,bkpt={number="1",type="breakpoint",disp="keep",enabled="y",addr="0x00001189",func="main",file="add.c",fullname="/home/ohsaki/code/tr-regs/add.c",line="3",thread-groups=["i1"],times="0",original-location="*main"}
+(gdb) 
+#+end_src
+
+GDB Wiki にも多数のフロントエンドが紹介されています (図 [[fig:tr-regs/gdb-wiki]])。
+「これぞ決定版」という GDB のフロントエンドは存在しないようですが、
+Emacs 上で GDB を起動する方法や、
+GNU DDD (図 [[fig:tr-regs/ddd]]) などは用途によっては便利に使えることでしょう。
+GDB の TUI モードや、
+既存のフロントエンドに不満を感じたら、
+フロントエンドの自作に挑戦しても面白いと思います。
+
+#+caption: GDB front ends and other tools (https://www.sourceware.org/gdb/wiki/GDB%20Front%20Ends)
+#+label: fig:tr-regs/gdb-wiki
+#+attr_latex: :width .7\columnwidth
+[[./figure/tr-regs/gdb-wiki.png]]
+
+#+caption: GNU DDD (Data Display Debugger) (https://www.gnu.org/software/ddd/)
+#+label: fig:tr-regs/ddd
+#+attr_latex: :width .7\columnwidth
+[[./figure/tr-regs/ddd.png]]
+
+** 章末問題
+<<sec:tr-regs/quiz>>
+
+1. プログラム ~add.c~ (図 [[fig:tr-regs/add.c]]) の変数宣言から ~register~
+   キーワードを削除し、GCC によってアセンブリ言語プログラムに変換せ
+   よ。~register~ キーワードの有無によって、GCC が生成するアセンブリ言
+   語プログラムがどのように変化するかを分析せよ。
+
+2. GCC が生成したアセンブリ言語プログラム ~add.s~ (図
+   [[fig:tr-regs/add.s]])を適当に書き換えて、書き換えたプログラムの動作を
+   トレースしてみよ。ADD 命令を追加する、レジスタ名を書き換える、123
+   や 456 の定数を書き換えるなどを、自由に試してみよ。
+
+3. 自分が使用している GDB のバージョンに対応した GDB のドキュメント
+   (info) を入手せよ。
+
+   #+begin_answer
+   最新版の info は https://www.gnu.org/software/gdb/documentation/ からダウンロードできる。
+
+   過去のバージョンの info は https://ftp.gnu.org/gnu/gdb/ からダウンロードできる、
+   ソースコードのアーカイブ中に含まれている。
+   #+end_answer
+
+4. 本章でトレースしたプログラム ~add~ を、GDB の TUI モードを使って同
+   じようにトレースせよ。
+
+5. GDB の「info register」コマンドを使用すると、GDB でのデバッグ中にす
+   べてのレジスタの値を表示できる。プログラム ~add~ のトレースにおいて、
+   (1) 本章で使用した display コマンドを使って特定のレジスタの値を表示
+   する方法、(2) GDB の TUI モードを使ってレジスタの値を表示する方法、
+   (3) info register コマンドを使ってレジスタの値の一覧を表示する方法、
+   の 3 つの方法を試してみよ。3 種類の方法の利点・欠点を比較し、プログ
+   ラム ~add~ のトレースにはどれが適しているかを分析せよ。
+
+6. GDB のウォッチポイント (watch point) を使えば、レジスタの値やメモリ
+   に格納されている値が変化した時にプログラムの実行を一時停止できる。
+   ウォッチポイントを使用して、プログラム ~add~ の動作をトレースしてみ
+   よ。具体的には、演算結果を保存しているレジスタ (例: レジスタ ESI や
+   EBX) にウォッチポイントを設定し、continue コマンドを繰り返し実行せ
+   よ。
+
+7. Emacs の GDB インターフェース (GUD; Grand Unified Debugger
+   (https://www.emacswiki.org/emacs/GrandUnifiedDebugger)) を使用して、
+   プログラム ~add~ をトレースせよ。
+
+8. GNU DDD (Data Display Debugger) (https://www.gnu.org/software/ddd/)
+   を使用して、プログラム ~add~ をトレースせよ。

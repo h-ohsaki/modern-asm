@@ -1,0 +1,121 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+#+latex_header: \usepackage{etoolbox}
+#+latex_header: \usepackage{framed}
+#+latex_header: \usepackage{tcolorbox}
+
+#+begin_export latex
+
+% etoolbox.sty
+% Embed hooks for tabular/longtable environments.
+\AtBeginEnvironment{tabular}{%
+  \rowcolors{2}{}{black!3}%
+  \small%
+}
+\AtBeginEnvironment{longtable}{%
+  \rowcolors{2}{}{black!3}%
+  \small%
+}
+
+% Define macros.
+\def\posn#1{\ifmmode {}_{(#1)} \else ${}_{(#1)}$ \fi}
+\def\r#1{\ifmmode r_{#1} \else $r_{#1}$ \fi}
+\def\ri#1{\ifmmode r^{16}_{#1} \else $r^{16}_{#1}$ \fi}
+\def\pc{\ifmmode pc \else $pc$ \fi}
+\def\sp{\ifmmode sp \else $sp$ \fi}
+\def\zf{\ifmmode z\!f \else $z\!f$ \fi}
+\def\sf{\ifmmode s\!f \else $s\!f$ \fi}
+\def\cf{\ifmmode c\!f \else $c\!f$ \fi}
+\def\of{\ifmmode o\!f \else $c\!f$ \fi}
+
+% framed.sty
+% Environment for notes.
+\newenvironment{note}{%
+  \def\FrameCommand{\vrule width 3pt \hspace{6pt}}
+  \MakeFramed {\advance\hsize-\width \FrameRestore}
+  \noindent {\bf ノート}
+  \begin{quote}
+  \small
+}%
+{\end{quote}
+\endMakeFramed}
+
+% listings.sty
+\def\lstlistingname{リスト}
+\def\lstlistlistingname{リスト目次}
+% Color and style definitions.
+\definecolor{darkblue}{rgb}{0.05,0.1,0.4}
+\definecolor{darkgreen}{rgb}{0.05,0.4,0.1}
+\definecolor{darkred}{rgb}{0.4,0.1,0.05}
+\lstset{basicstyle=\footnotesize\ttfamily,%
+  backgroundcolor=\color{black!3},rulecolor=\color{black!10},%
+  framesep=4pt,lineskip=0pt,numbers=none,breaklines=true,%
+  keywordstyle=\color{darkblue}\bfseries,  
+ identifierstyle=\color{darkblue},%
+  commentstyle=\color{darkred},%
+  stringstyle=\color{darkgreen}%,
+}
+
+% Tabular environment spanning to the paper width.
+\newsavebox{\maxtabularbox}
+\newenvironment{maxtabular}[1]{%
+  \begin{lrbox}{\maxtabularbox}%
+  \begin{tabular}{#1}%
+      }{%
+    \end{tabular}%
+  \end{lrbox}%
+  \resizebox{\columnwidth}{!}{\usebox{\maxtabularbox}}%
+}
+
+% tcolorbox.sty
+% Emulate highlight markers for bold, italic, and underline.
+\definecolor{Cyan}{rgb}{0.0,1.0,1.0}
+\newtcbox{\mybox}[1][Cyan]{%
+  on line,%
+  arc=0pt,outer arc=0pt,%
+  colback=#1!20!white,%
+  colframe=#1!50!black,%
+  boxsep=0pt,left=1.5pt,right=1.5pt,top=1.5pt,bottom=1.5pt,%
+  boxrule=0pt,bottomrule=0pt,toprule=0pt}
+% \renewcommand{\textbf}[1]{%
+%   \mybox{\bfseries #1}}
+% \renewcommand{\emph}[1]{%
+%   \mybox[red]{#1}}
+% \renewcommand{\uline}[1]{%
+%   \mybox[yellow]{#1}}
+
+% Macro for assembly instruction.
+% https://stackoverflow.com/questions/1679671/use-of-the-verbatim-environment-inside-a-macro
+\makeatletter
+\def\instmain#1{\mybox[gray]{\small\texttt{#1}}}
+\def\inst{\begingroup 
+  \let\do\@makeother \dospecials \catcode`\{=1 \catcode`\}=2 \obeylines \@vobeyspaces
+  \instplus}
+\def\instplus#1{\instmain{#1}\endgroup}
+\makeatother
+
+\newenvironment{answer}{%
+  \def\FrameCommand{\vrule width 1pt \hspace{0pt}}
+  \MakeFramed {\advance\hsize-\width \FrameRestore}
+  \small
+  \noindent (略解) \\
+}%
+{\endMakeFramed}
+
+#+end_export

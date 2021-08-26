@@ -1,0 +1,3627 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* RISC CPU の例: Armv8-A
+<<ch:arm>>
+
+** Armv8-A の概要
+<<sec:arm/overview>>
+
+*** ARM とは何か?
+
+まず、
+「ARM とは何か?」
+の説明から始めましょう。
+
+現在、
+ARM という単語が、
+いろいろなものを表すために使われていて、
+大変わかりづらい状況です。
+例えば、
+ARM や Arm という 3 文字が含まれた、
+以下のようなさまざまな用語があります。
+
+- Arm (ARM アーキテクチャを設計した会社名)
+- ARM アーキテクチャ (Arm 社が設計したプロセッサファミリのアーキテクチャ)
+- Armv8 (第 8 世代の ARM 命令セットアーキテクチャ)
+- Armv8-A (Armv8 のプロファイルの1つ)
+- ARM Cortex-A72 (Armv8-A プロファイルを実装したプロセッサコア)
+
+つまり、ARM や Arm は、
+- 会社名かもしれない
+- アーキテクチャのファミリ名かもしれない
+- 特定の命令セットアーキテクチャ名かもしれない
+- 特定の命令セットアーキテクチャのプロファイルの一つかもしれない
+- プロセッサコアかもしれない
+という状況です。
+
+まず、
+ARM アーキテクチャを設計している会社が *Arm (Arm ホールディングス) 社* です。
+当初、
+会社名は「Advanced RISC Machines」でしたが、
+1998 年に「ARM」に変更されました。
+さらに、
+2017 年に会社名の表記が変更され、
+Arm 社のロゴは「arm」と小文字で表記し、
+文中に記載する場合は「Arm」と先頭を大文字で記載することになりました。
+
+#+begin_note
+前述のように、
+単に「Arm」とだけ書くと何を表すかがわかりづらいため、
+本書では Arm ホールディングスのことを「Arm 社」と表記します。
+#+end_note
+
+Arm 社が設計している、
+コンピュータプロセッサのための RISC アーキテクチャのファミリが *ARM アーキテクチャ (ARM architecture)* です。
+特定の型番の特定のプロセッサのアーキテクチャを指すのではなく、
+一連のアーキテクチャのファミリを表します。
+
+Arm 社はプロセッサの設計のみを行い、
+自社ではプロセッサの製造・販売を行っていないというのがその大きな特徴です。
+通常、
+プロセッサを設計した企業は、
+その製造・開発も行います。
+例えば、
+インテルは、
+IA-32 アーキテクチャのプロセッサを設計し、
+それらを製造・販売しています。
+Arm 社は、
+このような企業とは異なり、
+プロセッサの設計は行いますが、
+それらの製造・販売は行っていません。
+したがって、
+例えば「arm」という製造者のロゴの入った、
+ARM アーキテクチャの CPU は (製造されていないため) 手に入りません。
+
+ARM アーキテクチャには、
+Armv6、
+Armv7、
+Armv8、
+Armv8.1、
+Armv8.2 のようにバージョンが付けられた、
+複数の *命令セットアーキテクチャ (ISA; Instruction Set Architecture)* があります。
+ARM アーキテクチャにおける、
+命令セットアーキテクチャのバージョン 7 が Armv7 です。
+同様に、
+命令セットアーキテクチャのバージョン 8 が Armv8 です。
+
+#+begin_note
+多くのドキュメントでは Armv8 ではなく ARMv8 のように大文字で表記されています。
+Arm 社のドキュメントの多くでも、
+「ARMv8」のように大文字で表記されています。
+しかし、
+Arm 社の会社名の表記変更にともなって、
+Arm 社の新しいドキュメントでも、
+先頭のみを大文字にした「Armv8」という表記が用いられているようです。
+本書では「Armv8」という表記に統一しています。
+#+end_note
+
+2021 年 6 月の時点で、
+最新の ARM 命令セットアーキテクチャは Armv8.7 です。
+Armv1 から Armv7 までは 32 ビットの命令セットアーキテクチャでしたが、
+Armv8 から 64 ビットのサポートも加わりました。
+
+やや分かりづらいのですが、
+ARM の命令セットアーキテクチャには、
+M (Microcontroller)、
+A (Application)、
+R (Real-time) という 3 種類の *プロファイル (profile)* があります。
+Armv8 は「ARM 命令セットアーキテクチャのバージョン 8」ですが、
+Armv8 には、
+マイクロコントローラ向けの Armv8-M と、
+アプリケーション向けの Armv8-A、
+リアルタイム向けの Armv8-R の 3 種類があります。
+
+おおよそ、
+組み込み系のシステムで使われている ARM 命令セットアーキテクチャが「Armv なんとか -M」で、
+スマートフォンやパソコンで使われているものが「Armv なんとか -A」、
+リアルタイム系のシステムで使われているものが「Armv なんとか -R」です。
+
+2021 年の時点では、
+大部分のスマートフォンやタブレット PC に搭載されているマイクロプロセッサの命令セットアーキテクチャが「Arvm なんとか -A」です。
+
+例えば、
+Apple の iPad Air (10.9 インチ、
+第 4 世代、
+2020 年秋モデル) に搭載されているプロセッサは Apple の A14 Bionic (図 [[fig:arm/a14]]) です。
+A14 Bionic の CPU の命令セットアーキテクチャは Armv8.5-A です。
+つまり、
+iPad Air の CPU には、
+Arvm8.5 のアプリケーション向けプロファイルの命令セットアーキテクチャが採用されています。
+
+# https://www.apple.com/ipad-air/specs/
+
+#+caption: Apple の A14 Bionic (https://static.papergeek.fr/2020/08/A14-BIONIC-Apple.jpg)
+#+label: fig:arm/a14
+#+attr_latex: :width .5\columnwidth
+[[./figure/arm/a14.jpg]]
+
+#+begin_note
+このあたりも関係がややこしいのですが、
+A14 Bionic 自体は Apple が設計・製造したプロセッサです。
+Apple は、
+Arm 社からライセンスを受けて、
+ARM 命令セットアーキテクチャ Armv8.5-A のプロセッサを、
+自社で設計・製造しています。
+したがって、
+iPad Air を分解して基板上のチップを調べても、
+Arm 社が製造した CPU のチップは見つかりません。
+しかし、
+iPad Air 上で動作しているソフトウェアからは、
+Armv8.5-A を解釈する CPU が動作しているように見えます。
+#+end_note
+
+同様に、
+Lenovo の Tab B10 (Android 搭載タブレット) に搭載されているプロセッサは Qualcomm の Snapdragon 429 (図 [[fig:arm/snapdragon429]]) です。
+Snapdragon 429 の CPU は、
+4 コアの Arm Cortex-A53 です。
+Arm Cortex A53 は、
+Arvm8-A の 64 ビット命令セットを実装したプロセッサコアです。
+
+# https://www.qualcomm.com/products/snapdragon-429-mobile-platform
+
+#+caption: Qualcomm の Snapdragon 429 (https://gizblog.it/wp-content/uploads/2018/06/qualcomm-snapdragon-429-e-439-in-arrivo.jpg)
+#+label: fig:arm/snapdragon429
+#+attr_latex: :width .5\columnwidth
+[[./figure/arm/snapdragon429.jpg]]
+
+#+begin_note
+したがって、
+iPad Air の場合と同じように、
+Lenovo の Tab B10 を分解して基板上のチップを調べても、
+Arm 社が製造した CPU のチップは見つかりません。
+しかし、
+Lenovo の Tab B10 上で動作しているソフトウェアからは、
+やはり Armv8-A を解釈する CPU が動作しているように見えます。
+#+end_note
+
+ARM Cortex-M、
+ARM Cortex-A、
+ARM Cortex-R は、
+Arm 社がライセンスしている ARM アーキテクチャのプロセッサコアのグループ名です。
+ARM Cortex-M グループには、
+Cortex-M0、
+Coretex-M1、
+Coretex-M4、
+Coretex-M7 などの、
+「Cortex-M なんとか」という名前のコアが含まれます。
+同様に、
+ARM Cortex-A グループには、
+Cortex-A5、
+Coretex-A12、
+Coretex-A53、
+Coretex-A75 などの、
+「Cortex-A なんとか」という名前のコアが含まれます。
+ARM Cortex-R グループには、
+Cortex-R4(F)、
+Coretex-R7(F)、
+Coretex-R52(F) などの、
+「Cortex-R なんとか」という名前のコアが含まれます。
+
+例えば、
+ARM Cortex-A53 は、
+Armv8-A の 64 ビット命令セットを実装したプロセッサコアです。
+先ほどの Snapdragon 429 では、
+- チップ (Snapdragon 429) を設計・製造しているのは Qualcomm である
+- Qualcomm は、Arm 社から Cortex-A53 のライセンスを受けて Snapdragon
+  429 に搭載している
+- Snapdragon 429 の CPU は Arvm8-A 命令セットアーキテクチャである
+という関係になります。
+
+以下では、
+Armv8-A 命令セットアーキテクチャの *64 ビット命令セット (A64)* を紹介します。
+
+*** ARM エミュレータ + GDB によるトレース
+
+Armv8-A 命令セットアーキテクチャや、
+Armv8-A の 64 ビット命令セット (A64) については [[sec:arm/arch]] 節で説明します。
+
+COMET II ([[sec:comet/overview]] 節) や AVR アーキテクチャ ([[sec:avr/overview]] 節) の場合と同じように、
+Armv8-A 命令セットアーキテクチャの中身を知る前に、
+デバッガを用いて Armv8-A 機械語プログラムの動作をトレースしてみましょう。
+
+Armv8-A アーキテクチャのコンピュータを用意して、
+その上で機械語プログラムの動作をトレースしてもよいのですが、
+本書では ARM の 64 ビットモード (AArch64) のエミュレータを使用します。
+具体的には、
+IA-32 アーキテクチャ向けの Debian GNU/Linux 上で、
+AArch64 のエミュレータである QEMU と、
+AArch64 向けの GDB を使用します。
+
+まず、
+以下のプログラムを ~add.c~ というファイル名で保存します (図 [[fig:arm/add.c]])。
+IA-32 アーキテクチャ上でレジスタの値の変化のトレースに使用したプログラム (図 [[fig:tr-regs/add.c]]) とまったく同じものです。
+
+#+caption: arm/add.c
+#+label: fig:arm/add.c
+#+include: "code/arm/add.c" src C
+
+IA-32 アーキテクチャの Debian GNU/Linux 上でクロスコンパイルし、
+*AArch64 向けの* 実行ファイルを作成します。
+つまり、
+コンパイルするコンピュータのアーキテクチャは IA-32 ですが、
+C 言語のプログラム ~add.c~ (図 [[fig:arm/add.c]]) を、
+AArch64 (Armv8-A 命令セットアーキテクチャの 64 ビットモード) 向けにコンパイルします。
+コンパイルを実行するコンピュータのアーキテクチャが IA-32 で、
+対象となるコンピュータのアーキテクチャが AArch64 である GCC を使います。
+
+このため、
+通常の ~gcc~ コマンドではなく、
+AArch64 向けのクロスコンパイラである ~aarch64-linux-gnu-gcc-10~ コマンドを使用します。
+#+begin_src sh
+$ aarch64-linux-gnu-gcc-10 -fno-pic -fomit-frame-pointer -static -o add add.c
+#+end_src
+GCC のコンパイル時オプションに ~-static~ を追加し、
+静的リンクした実行ファイルを生成しています。
+
+AVR アーキテクチャの場合 ([[sec:avr/overview]] 節) と同じように、
+AArch64 向けの GNU binutils などを使用すれば、
+生成された実行ファイルの中身を確認できます。
+
+生成された ~add~ ファイルの中身を見てみます。
+#+begin_src sh
+$ file add
+add: ELF 64-bit LSB executable, ARM aarch64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=df609b41c504de9d504ab25a6072443e4e1299bc, for GNU/Linux 3.7.0, not stripped
+#+end_src
+ELF 形式の実行ファイルで、
+ARM AArch64 向けのプログラムであることがわかります。
+さらに、
+~aarch64-linux-gnu-objdump~ コマンドを使用して、
+実行ファイル ~add~ を逆アセンブルしてみます (コマンドの出力の一部のみを掲載しています)。
+#+begin_src raw
+$ aarch64-linux-gnu-objdump -d -j .text add
+
+add:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+0000000000400340 <abort>:
+  400340:       a9ab7bfd        stp     x29, x30, [sp, #-336]!
+  400344:       b0000440        adrp    x0, 489000 <__sys_errlist_internal+0x348>
+  400348:       910003fd        mov     x29, sp
+  40034c:       a90153f3        stp     x19, x20, [sp, #16]
+  400350:       90000473        adrp    x19, 48c000 <object.0+0x28>
+	:
+	:
+0000000000400724 <main>:
+  400724:       a9bf53f3        stp     x19, x20, [sp, #-16]!
+  400728:       52800f73        mov     w19, #0x7b                      // #123
+  40072c:       11000673        add     w19, w19, #0x1
+  400730:       52803914        mov     w20, #0x1c8                     // #456
+  400734:       0b130294        add     w20, w20, w19
+  400738:       2a1403e0        mov     w0, w20
+  40073c:       a8c153f3        ldp     x19, x20, [sp], #16
+  400740:       d65f03c0        ret
+  400744:       d503201f        nop
+  400748:       d503201f        nop
+  40074c:       d503201f        nop
+	:
+	:
+#+end_src
+ここでは、
+~-j~ オプションを指定して、
+.text セクションのみを逆アセンブルしています。
+プログラムの本体 (関数 ~main~) は NOP 命令を含めても 11 命令だけです。
+このくらい短いプログラムなら楽に読み解けそうです。
+
+実行ファイル ~add~ は AArch64 向けの実行ファイルなので、
+当然ながら IA-32 アーキテクチャの Debian GNU/Linux 上では実行できません。
+#+begin_src sh
+$ uname -m
+x86_64
+$ ./add 
+Failed to execute process './add'. Reason:
+exec: Exec format error
+The file './add' is marked as an executable but could not be run by the operating system.
+#+end_src
+
+~qemu-aarch64~ コマンドを使用して、
+QEMU の AArch64 エミュレータ上で実行します。
+#+begin_src sh
+$ qemu-aarch64 add
+$ echo $?
+68
+#+end_src
+エミュレータ上でプログラム ~add~ を実行しても何も表示されませんが、
+正しく実行できています。
+~add.c~ の関数 ~main~ では、
+変数 ~j~ の値を返しています。
+変数 ~j~ の値は 123 + 1 + 456 = 580 で、
+プロセスの終了ステータスは下位 8 ビットを返します。
+プロセスの終了ステータスとして、
+68 (580 の下位 8 ビット) が正しく返されていることがわかります。
+
+では、
+デバッガの監視下でプログラム ~add~ を実行してみましょう。
+Armv8-A の機械語プログラムの実行に QEMU エミュレータを使っているため、
+通常の GDB の使い方とは異なり、
+QEMU の GDB サーバを起動して、
+GDB のリモートデバッグ機能を使用します (図 [[fig:gdb-remote]])。
+
+#+caption: QEMU の GDB サーバと GDB のリモートデバッグ
+#+label: fig:gdb-remote
+#+attr_latex: :width \columnwidth
+[[./figure/arm/gdb-remote.png]]
+
+~qemu-aarch64~ コマンドに ~-g~ オプションを付与し、
+QEMU の GDB サーバを有効にします。
+ここでは末尾に ~&~ を付けて、
+~qemu-aarch64~ コマンドをバックグラウンドプロセスとして起動します。
+#+begin_src sh
+$ qemu-aarch64 -g 1234 add &
+#+end_src
+~-g~ オプションの引数 1234 は使用するポート番号です。
+
+GDB には、
+通常の ~gdb~ コマンドではなく、
+複数のアーキテクチャに対応した ~gdb-multiarch~ コマンドを使用します。
+あらかじめ、
+~.gdbinit~ ファイルには以下のように記載しておきます (図 [[fig:arm/.gdbinit]])。
+
+#+caption: arm/.gdbinit
+#+label: fig:arm/.gdbinit
+#+include: "code/arm/.gdbinit" src gdb
+
+1 行目の target コマンドでは、
+1234 番ポートの GDB サーバに接続し、
+GDB のリモートデバッグを有効にしています。
+2 行目の file コマンドでは、
+デバッグする実行ファイルを指定しています。
+これにより、
+ファイル ~add~ からシンボルテーブルが読み込まれます。
+break コマンドや display コマンドの用法はこれまで (例えば [[sec:tr-regs/dbg]] 節) と同じです。
+
+~gdb-multiarch~ コマンドを起動すれば、
+GDB サーバに接続し、
+リモートデバッグを開始します。
+#+begin_src gdb
+$ gdb-multiarch -q
+warning: No executable has been specified and target does not support
+determining executable automatically.  Try using the "file" command.
+0x00000000004005d0 in ?? ()
+Breakpoint 1 at 0x400724
+(gdb) 
+#+end_src
+プログラムカウンタの値が 0x0000 0000 0040 05d0 で、
+QEMU エミュレータ内部でプログラム ~add~ の実行が一時停止しています。
+
+通常の GDB では、
+run コマンドでプログラムの実行を開始します。
+今は GDB のリモートデバッグによって、
+一時停止中の QEMU に接続しているので、
+continue コマンド (省略形は c) でプログラムの実行を継続します。
+#+begin_src gdb
+(gdb) c
+Continuing.
+
+Breakpoint 1, 0x0000000000400724 in main ()
+1: /x $w19 = 0x400280
+2: /x $w20 = 0x400e00
+3: x/4i $pc
+=> 0x400724 <main>:     stp     x19, x20, [sp, #-16]!
+   0x400728 <main+4>:   mov     w19, #0x7b                      // #123
+   0x40072c <main+8>:   add     w19, w19, #0x1
+   0x400730 <main+12>:  mov     w20, #0x1c8                     // #456
+(gdb) 
+#+end_src
+細かい点では異なりますが、
+IA-32 アーキテクチャや AVR アーキテクチャにおける GDB の出力とほとんど同じあることがわかります。
+
+~$w19~ や ~$w20~ はレジスタ W19 や W20 の値を表しています。
+~$pc~ はプログラムカウンタです。
+上の出力から、
+現在、
+プログラムカウンタの値が 0x400724 であることがわかります。
+
+Armv8 の命令セットはまだ学んでいないため、
+逆アセンブル結果はよくわからないかもしれません。
+ただし、
+mov や add は、
+それぞれ MOV 命令と ADD 命令だろうと思われます。
+
+プログラム ~add~ をステップ実行し、
+レジスタの変化をトレースしてみましょう。
+最初の命令は、
+少し複雑な \inst{stp x19, x20, [sp, #-16]!} です。
+STP という名前の命令で、
+オペランドが 3 つあることがわかります。
+第 3 オペランドの末尾に ~!~ という見慣れない記号が付いています。
+詳細は後ほど説明しますが、
+この命令は、
+レジスタ X19 および X20 の値をスタックにプッシュします。
+
+1 命令分ステップ実行します。
+#+begin_src gdb
+(gdb) si
+0x0000000000400728 in main ()
+1: /x $w19 = 0x400280
+2: /x $w20 = 0x400e00
+3: x/4i $pc
+=> 0x400728 <main+4>:   mov     w19, #0x7b                      // #123
+   0x40072c <main+8>:   add     w19, w19, #0x1
+   0x400730 <main+12>:  mov     w20, #0x1c8                     // #456
+   0x400734 <main+16>:  add     w20, w20, w19
+(gdb) 
+#+end_src
+
+GDB の x コマンドでスタックの内容を表示してみましょう。
+これも後ほど説明しますが、
+AArch64 は 64 ビットモードであり、
+レジスタ X19 や X20 は 64 ビットのレジスタです。
+そして、
+レジスタ X19 や X20 の下位 32 ビットがレジスタ W19 や W20 です。
+スタックポインタが指すアドレスから 64 バイト (64 ビット \times 8 個) の値をダンプします。
+#+begin_src gdb
+(gdb) x/8gx $sp
+0x5500800360:   0x0000000000400280      0x0000000000400e00
+0x5500800370:   0x0000000000000000      0x0000000000400604
+0x5500800380:   0x0000000000000000      0x0000000000000000
+0x5500800390:   0x0000000000000000      0x0000000000000000
+(gdb) 
+#+end_src
+レジスタ X19 と X20 の値 (下位 32 ビットがレジスタ W19 と W20 と等しくなっています) がスタックの一番上に格納されていることがわかります。
+
+次の命令は \inst{mov w19, #0x7b} です。
+MOV 命令で、
+第 1 オペランドが ~w19~、
+第 2 オペランドが ~#0x7b~ です。
+16 進数の 0x7b は 10 進数で 123 です。
+これにより、
+即値 123 が、
+レジスタ W19 に読み込まれるのだと想像できます。
+実際に実行してみましょう。
+#+begin_src gdb
+(gdb) si
+0x000000000040072c in main ()
+1: /x $w19 = 0x7b ← レジスタ W19 の値が 0x7b (= 123) に変化した
+2: /x $w20 = 0x400e00
+3: x/4i $pc
+=> 0x40072c <main+8>:   add     w19, w19, #0x1
+   0x400730 <main+12>:  mov     w20, #0x1c8                     // #456
+   0x400734 <main+16>:  add     w20, w20, w19
+   0x400738 <main+20>:  mov     w0, w20
+(gdb) 
+#+end_src
+レジスタ W19 の値が 123 に変化しました。
+
+次の命令は \inst{add w19, w19, #01} です。
+3 つのオペランドの表記は見慣れないものの、
+プログラム ~add.c~ 中で対応する箇所は
+#+begin_src C
+  i = i + 1;
+#+end_src
+のはずです。
+おそらく、
+レジスタ W19 の値が 1 だけ増加するのでしょう。
+
+1 命令分ステップ実行します。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x0000000000400730 in main ()
+1: /x $w19 = 0x7c ← レジスタ W19 の値が 1 だけ増加した
+2: /x $w20 = 0x400e00
+3: x/4i $pc
+=> 0x400730 <main+12>:  mov     w20, #0x1c8                     // #456
+   0x400734 <main+16>:  add     w20, w20, w19
+   0x400738 <main+20>:  mov     w0, w20
+   0x40073c <main+24>:  ldp     x19, x20, [sp], #16
+(gdb) 
+#+end_src
+レジスタ W19 の値が 1 だけ増加しました。
+
+次の命令は \inst{mov w20, #0x1c8} です。
+先ほどの MOV 命令とほぼ同じです。
+レジスタ W20 に即値 0x1c8 (= 456) が格納されるのでしょう。
+さらに 1 命令分ステップ実行します。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x0000000000400734 in main ()
+1: /x $w19 = 0x7c
+2: /x $w20 = 0x1c8 ← レジスタ W20 の値が 0x1c8 (= 456) に変化した
+3: x/4i $pc
+=> 0x400734 <main+16>:  add     w20, w20, w19
+   0x400738 <main+20>:  mov     w0, w20
+   0x40073c <main+24>:  ldp     x19, x20, [sp], #16
+   0x400740 <main+28>:  ret
+(gdb) 
+#+end_src
+レジスタ W20 の値が 0x1c8 に変化しました。
+
+次の命令は \inst{add w20, w20, w19} です。
+プログラム ~add.c~ 中の対応する箇所は
+#+begin_src C
+  j = i + j;
+#+end_src
+でしょう。
+ここまで、
+変数 ~i~ の値がレジスタ W19 に格納されており、
+変数 ~j~ の値がレジスタ W20 に格納されています。
+このため、
+レジスタ W20 に、
+レジスタ W19 の値が加算されると思われます。
+
+1 命令分ステップ実行します。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x0000000000400738 in main ()
+1: /x $w19 = 0x7c
+2: /x $w20 = 0x244 ← レジスタ W20 にレジスタ W19 の値が加算された
+3: x/4i $pc
+=> 0x400738 <main+20>:  mov     w0, w20
+   0x40073c <main+24>:  ldp     x19, x20, [sp], #16
+   0x400740 <main+28>:  ret
+   0x400744:    nop
+(gdb) 
+#+end_src
+レジスタ W20 の値が 0x244 (= 580) に変化しました。
+
+これ以降の
+#+begin_src asm-a64
+=> 0x400738 <main+20>:  mov     w0, w20
+   0x40073c <main+24>:  ldp     x19, x20, [sp], #16
+   0x400740 <main+28>:  ret
+#+end_src
+は、
+まず、
+計算結果である 0x244 (= 580) を関数 ~main~ の返り値としてレジスタ W0 に保存しています。
+その後、
+レジスタ X19 および X20 の値をスタックからポップした後、
+サブルーチンからリターンしています。
+
+当然ですが、
+Armv8-A のアセンブリ言語は、
+IA-32 アーキテクチャのアセンブリ言語とも、
+AVR アーキテクチャのアセンブリ言語とも大きく異なっています。
+しかし、
+細かい点を除くと、
+「IA-32 アーキテクチャも、
+AVR アーキテクチャも、
+ARM アーキテクチャもほとんど同じようなもの」であることがわかるでしょう。
+
+Armv8-A の機械語プログラムの場合でも、
+登場しているのはレジスタや、
+スタック、
+即値です。
+命令のニーモニックも、
+MOV 命令、
+ADD 命令、
+RET 命令など、
+名前から命令の動作が容易に想像できそうなものが多くあります。
+
+以下では、
+IA-32 アーキテクチャ、
+COMET II、
+AVR アーキテクチャとの違いを中心に、
+Armv8-A 命令セットアーキテクチャの 64 ビットモードを説明します。
+
+** GNU アセンブラ (ARM 固有の機能)
+<<sec:arm/gas>>
+
+すばらしいことに、
+IA-32 アーキテクチャでも、
+AVR アーキテクチャでも、
+ARM アーキテクチャでも、
+同じ GNU のツールチェインが利用できます。
+
+そのためここでは GAS の AArch64 に固有の機能を中心に説明していきます。
+詳細については GAS のドキュメント /(as)AArch64-Dependent/ を参照してください。
+
+*** コメント・行の区切り
+
+GAS におけるコメント文字は対象となるコンピュータごとに異なります ([[sec:gas/syntax]] 節、
+[[sec:avr/gas]] 節)。
+
+AArch64 では、
+コメント開始文字は、
+C++ 言語と同じ *ダブルスラッシュ (~//~)* です。
+IA-32 アーキテクチャのコメント開始文字である番号記号 (~#~) とも、
+AVR アーキテクチャのコメント開始文字であるセミコロン (~;~) とも異なります。
+また、
+AVR アーキテクチャの場合 ([[sec:avr/gas]] 節) と同じく、
+行頭に番号記号 (~#~) のある行はコメントとして扱われます (2 カラム目以降の ~#~ はコメントとみなされません)。
+
+なお、
+行の区切りは、
+IA-32 アーキテクチャと同じセミコロン (~;~) です。
+
+*** レジスタ・即値の表記法
+
+レジスタの表記法は、
+AVR アーキテクチャの場合と同じように、
+#+begin_src asm-a64
+	mov	x19, 123
+	add	x19, x19, #456
+#+end_src
+のように *単にレジスタ名を記載* します。
+IA-32 アーキテクチャの場合のように、
+#+begin_src asm-a64
+	movl	$123, %eax
+	addl	$456, %eax
+#+end_src
+のようにレジスタ名の先頭にパーセント (~%~) を付けません (付けると文法エラーになります)。
+
+上記の例からわかるように、
+AArch64 では、
+*即値の前の番号記号 (~#~)* は、
+付けても付けなくてもかまいません (省略可能です)。
+ちなみに、
+IA-32 アーキテクチャでは、
+即値の前のドル記号 (~$~) は必須でした。
+
+ARM アーキテクチャは RISC です。
+同じ RISC である AVR アーキテクチャと同じように、
+Armv8-A のアドレス指定モードの種類はそれほど多くありません。
+このため、
+レジスタ名の先頭にパーセント (~%~) などを付けなくても、
+GAS は、
+ある文字列がレジスタ名なのかラベルなのかを判別することができます ([[sec:avr/gas]] 節)。
+
+*** 再配置指定子 (relocation specifier)
+
+Armv8-A の 64 ビットモードでは、
+*すべての命令語長は 32 ビット* です。
+IA-32 アーキテクチャの命令語は可変長であり、
+AVR アーキテクチャは大半の命令語長が 16 ビット (一部の命令語長が 32 ビット) でした。
+
+したがって、
+Armv8-A では即値の扱いに制限があります。
+命令語長が 32 ビットなので、
+命令のオペランドに指定できる即値の値は最大でも 26 ビットです (何ビット指定できるかは命令によります)。
+
+IA-32 アーキテクチャでは、例えば、
+#+begin_src asm
+	movl	$0x12345678, %eax
+#+end_src
+のように 32 ビットの即値 0x1234 5678 をオペランドに書けました。
+
+また、
+AVR アーキテクチャでは、
+大半の命令語長は 16 ビットのため、
+多くの命令のオペランドに 16 ビットの即値は指定できません。
+しかし、
+一部の命令語長は 32 ビットあるため、
+#+begin_src asm
+	lds	r0, 0x0180
+#+end_src
+のように、
+1 命令で 16 ビットの即値 0x0180 をオペランドに書けました。
+
+しかし、
+Armv8-A ではすべての命令語長が 32 ビットなので、
+どう頑張っても 32 ビットの即値をオペランドに書けません。
+したがって、
+例えば、
+レジスタ W0 に 0x12345678 を格納したいときは
+#+begin_src asm-a64
+	mov	w0, 0x5678
+	movk	w0, 0x1234, lsl 16
+#+end_src
+のように、
+2 つの命令の即値に、
+値の上位 16 ビットと下位 16 ビットをそれぞれ書きます。
+
+#+begin_note
+Armv8-A のアドレス指定モードは後ほど説明しますが、
+上記の 2 命令の動作を CPU 処理の抽象モデルで記述すると以下のようになります。
+#+begin_quote
+	w0 ← 0x5678 \\
+	w0 ← <\vbar> (0x1234 << 16)
+#+end_quote
+つまり、
+2 番目の命令
+#+begin_src asm-a64
+	movk	w0, 0x1234, lsl l16
+#+end_src
+は、
+0x1234 を左に 16 ビットシフトした値を、
+レジスタ W0 の上位 16 ビットに格納します。
+#+end_note
+
+同様に、
+64 ビットの即値をレジスタに読み込みたい場合は、
+16 ビットずつを 4 回に分けて格納します。
+例えば、
+レジスタ X0 に 0x1234 5678 9abc def0 を格納したいときは
+#+begin_src asm-a64
+        mov     x0, 0xdef0
+        movk    x0, 0x9abc, lsl 16
+        movk    x0, 0x5678, lsl 32
+        movk    x0, 0x1234, lsl 48
+#+end_src
+のように記述します。
+すべての命令語長が 32 ビットのため仕方がないとはいえ、
+これはこれで面倒です。
+
+なお、
+上の例では、
+プログラマが 64 ビットの値を手作業で 16 ビットに切り分けるのではなく、
+GAS のラベルと式を使用して
+#+begin_src asm-a64
+	v	= 0x123456789abcdef0
+	mov	x0, v & 0xffff
+	movk	x0, (v >> 16) & 0xffff, lsl 16
+	movk	x0, (v >> 32) & 0xffff, lsl 32
+	movk	x0, (v >> 48) & 0xffff, lsl 48
+#+end_src
+のように書けば少しは楽になります。
+
+ただし、
+ラベルが (リンカによって再配置される) メモリアドレスの場合はこのように書けません。
+#+begin_src asm-a64
+	mov	x0, v & 0xffff			// 書けない!
+	movk	x0, (v >> 16) & 0xffff, lsl 16	// 書けない!
+	movk	x0, (v >> 32) & 0xffff, lsl 32	// 書けない!
+	movk	x0, (v >> 48) & 0xffff, lsl 48	// 書けない!
+	:
+	:
+	.data
+v:	.long	0x12345678
+#+end_src
+ラベル ~v~ のメモリアドレスは、
+最終的にリンカが機械語のプログラムを再配置するときに決定します。
+逆に言えば、
+それまではラベル ~v~ のメモリアドレスが決まりません。
+アセンブル時にラベル ~v~ のメモリアドレスが確定しないため、
+上記のようには書けません。
+
+このような、
+再配置されるメモリアドレスを記述するには、
+GAS の *再配置指定子 (relocation specifier)* を使用します (表 [[tab:arm/reloc]])。
+表中の X[$n$:$m$] は、
+64 ビットの値 X の $m$ ビット目から $n$ ビット目を意味します。
+例えば、
+~:abs_g0:0x0000000012345678~ は、
+値の下位 16 ビット (0 ビットから 15 ビット) である 0x5678 を意味します。
+
+# https://www.keil.com/support/man/docs/armclang_ref/armclang_ref_zvb1510926525383.htm
+# https://stackoverflow.com/questions/38570495/aarch64-relocation-prefixes
+
+#+caption: GAS の再配置指定子 (relocation specifier)
+#+label: tab:arm/reloc
+| 演算子         | 即値                                            | 値の確認                   |
+|----------------+-------------------------------------------------+----------------------------|
+| ~:abs_g0:~     | X[15:0]                                         | 0 \le X < $2^{16}$         |
+| ~:abs_g1:~     | X[15:0]                                         | なし                       |
+| ~:abs_g0_nc:~  | X[31:16]                                        | 0 \le X < $2^{32}$         |
+| ~:abs_g1_nc:~  | X[31:16]                                        | なし                       |
+| ~:abs_g2:~     | X[47:32]                                        | 0 \le X < $2^{48}$         |
+| ~:abs_g2_nc:~  | X[47:32]                                        | なし                       |
+| ~:abs_g3:~     | X[63:48]                                        | なし                       |
+| ~:pg_hi21:~    | X[31:12]                                        | \vbar X \vbar \le $2^{32}$ |
+| ~:pg_hi21_nc:~ | X[31:12]                                        | なし                       |
+| ~:lo12:~       | X[11:0], X[11:1], X[11:2], X[11:3] (命令による) | なし                       |
+
+さきほどのプログラムは、
+GAS の再配置指定子を使って以下のように書きます。
+#+begin_src asm-a64
+	movz	x0, #:abs_g3:v		// v の 48〜63 ビットを格納
+	movk	x0, #:abs_g2_nc:v	// v の 32〜47 ビットを格納
+	movk	x0, #:abs_g1_nc:v	// v の 16〜31 ビットを格納
+	movk	x0, #:abs_g0_nc:v	// v の 0〜15 ビットを格納
+	:
+	:
+	.data
+v:	.long	0x12345678
+#+end_src
+
+** Armv8-A アーキテクチャ
+<<sec:arm/arch>>
+
+*** 概要
+
+それでは、
+Armv8-A アーキテクチャの概要を説明しましょう。
+そのために、
+まず、
+Armv8-A アーキテクチャに関係する、
+A64、
+A32、
+T32、
+AArch64、
+AArch32 などの用語の関係を整理します (図 [[fig:arm/term]])。
+
+#+caption: Armv8-A、A64、A32、T32、AArch64、AArch32 の関係
+#+label: fig:arm/term
+#+attr_latex: :width \columnwidth
+[[./figure/arm/term.png]]
+
+前述の通り、
+Armv8-A は命令セットアーキテクチャです。
+Arm8-A は、
+2 種類の実行状態 (64 ビットモードおよび 32 ビットモード) を持っています。
+Armv8-A における 64 ビットおよび 32 ビットのそれぞれの実行状態を、
+それぞれ *AArch64* および *AArch32* と呼びます。
+
+Armv8-A の実行状態が 64 ビットモード (AArch64) の場合、
+*64 ビットの命令セットである A64* を実行できます。
+逆に言えば、
+Armv8-A の実行状態が 32 ビット (AArch32) の場合は、
+64 ビットの命令セットである A64 は実行できません。
+この場合は、
+32 ビットや 16 ビットの命令セットである *A32* や *T32* を実行できます。
+したがって、
+例えば以下のような関係になります。
+- Arm 社の ARM アーキテクチャの一つである Armv8-A の AArch64 では A64
+  の命令が実行できる。
+- Arm 社の Cortex-A53 で A32 の命令を実行するためには AArch32 である必
+  要がある。
+
+#+caption: Armv8-A アーキテクチャ
+#+label: tab:arm/isa
+#+attr_latex: :environment maxtabular
+| 命令セットの種別     | RISC                                                                                      |
+| レジスタの大きさ     | 64 ビット (32 ビットでのアクセスも可)                                                     |
+| 汎用レジスタ数       | 30                                                                                        |
+| プログラムカウンタ   | PC レジスタ                                                                               |
+| スタックポインタ     | SP レジスタ                                                                               |
+| 特殊レジスタ         | ゼロレジスタ、リンクレジスタ                                                              |
+| フラグレジスタ       | フラグ N,、C、V、Z (PSTATE)                                                                     |
+| 命令数               | 800 以上                                                                                  |
+| 命令語の大きさ       | すべて 4 バイト (32 ビット)                                                               |
+| データサイズ         | 64 ビット (ダブルワード)、32 ビット (ワード)、16 ビット (ハーフワード)、8 ビット (バイト) |
+| 浮動小数点演算命令   | あり                                                                                      |
+| SIMD 命令            | あり                                                                                      |
+| メモリアドレス       | 64 ビット                                                                                 |
+| エンディアンネス     | リトルエンディアン (ビッグエンディアンも可)                                               |
+| メモリ保護           | あり                                                                                      |
+| ハードウェア割り込み | あり                                                                                      |
+
+本書では、
+Armv8-A の 64 ビットの命令セットである A64 のみを対象とします。
+Armv8-A の A32 命令セットや T32 命令セットについては文献 \cite{Arm:Armv8-A} を参照してください。
+
+A64 命令セットは、
+64 ビットの実行状態 (AArch64 動作モード) で利用できる命令セットです。
+Armv8-A は RISC であり、
+すべての命令語長が 32 ビットです。
+
+Armv8-A の最も詳しい情報源は、
+Arm 社が発行しているリファレンスマニュアル \cite{Arm:Armv8-A} です。
+インテルの開発者向けマニュアル \cite{Intel20:IA32} の膨大なページ数にも驚きました ([[sec:x86regs/document]] 節) が、
+Armv8-A のリファレンスマニュアルはそれを超える 8 538 ページです。
+
+#+begin_note
+歴代のすべての ARM アーキテクチャを収録しているわけでもなく、
+Armv8 アーキテクチャの 3 つのプロファイル (-M、
+-A、-R) を網羅しているわけでもありません。
+Armv8 のアプリケーション向けプロファイル Armv8-A のみの
+リファレンスマニュアルですが、
+8 538 ページもあります。
+#+end_note
+
+# https://alastairreid.github.io/ARM-v8a-xml-release/
+# https://developer.arm.com/architectures/cpu-architecture/a-profile/exploration-tools
+# https://developer.arm.com/documentation/ddi0596/2021-03/Base-Instructions
+
+*** データサイズ
+
+Armv8-A の AArch64 は 64 ビットモードなので、
+レジスタの大きさも、
+メモリアドレスの大きさもすべて 64 ビットです。
+
+残念なことに、
+IA-32 アーキテクチャにおけるデータサイズの用語 (図 [[fig:ia32-data-type]]) と、
+Armv8-A アーキテクチャにおけるデータサイズの用語 (図 [[tab:arm/data-type]]) が 1 つずれてしまっています。
+
+#+caption: Armv8-A アーキテクチャにおける基本データ型 (文献 \cite{Arm:Armv8-A} をもとに作成)
+#+label: tab:arm/data-type
+| 名称                       | バイト数 | ビット数 |
+|----------------------------+----------+----------|
+| バイト (byte)              |        1 |        8 |
+| ハーフワード (half word)   |        2 |       16 |
+| ワード (word)              |        4 |       32 |
+| ダブルワード (double word) |        8 |       64 |
+| クワッドワード (quad word) |       16 |      128 |
+| 半精度 (half precision)    |        2 |       16 |
+| 単精度 (single precision)  |        4 |       32 |
+| 倍精度 (double precision)  |        8 |       64 |
+
+[[sec:mem/data-size]] 節で述べたように、
+一般に、
+コンピュータが取り扱うデータの単位を「ワード」と呼びます。
+1 ワードが何バイトかは、
+そのコンピュータの CPU やアーキテクチャによります。
+したがって、
+誰かが間違っている訳でも、
+誰かがミスをした訳でもないのですが、
+#+begin_quote
+- IA-32 アーキテクチャにおける「ワード」は 16 ビットである
+- Armv8-A アーキテクチャにおける「ワード」は 32 ビットである
+#+end_quote
+という大変混乱する状況です。
+表 [[tab:arm/data-type-comparison]] のように、
+データの大きさを表す用語が 1 つずれてしまっています。
+
+#+caption: Armv8-A アーキテクチャと IA-32 アーキテクチャにおけるデータサイズの用語
+#+label: tab:arm/data-type-comparison
+| 名称                                   | Armv8-A (ビット) | IA-32 (ビット) |
+|----------------------------------------+------------------+----------------|
+| バイト (byte)                          |                8 | ←             |
+| ハーフワード (half word)               |               16 | なし           |
+| ワード (word)                          |               32 | 16             |
+| ダブルワード (double word)             |               64 | 32             |
+| クワッドワード (quad word)             |              128 | 64             |
+| 半精度 (half precision)                |               16 | ←             |
+| 単精度 (single precision)              |               32 | ←             |
+| 倍精度 (double precision)              |               64 | ←             |
+| 拡張倍精度 (extended double precision) |             なし | 80             |
+
+大変悩ましい状況ですが、
+これらの用語に慣れるしかりません。
+「IA-32 アーキテクチャの『ワード』は 16 ビット」、
+「Armv8-A アーキテクチャの『ワード』は 32 ビット」というのを頭に叩き込んで、
+「今、
+何の話をしているのか?」
+という文脈に応じて用語の意味を解釈してください。
+
+なお、
+Armv8-A アーキテクチャのエンディアンネスにも特徴があります。
+というのも、
+Armv8-A アーキテクチャは、
+通常はリトルエンディアンですが、
+*ビッグエンディアンに切り替えることも可能* となっています。
+とはいえ、
+現在はリトルエンディアンが推奨されているため、
+Armv8-A アーキテクチャのシステムの多くはリトルエンディアンで稼働しているはずです。
+しかし、
+「やろうと思えばビッグエンディアンに切り替えられる」という珍しいアーキテクチャになっています。
+
+*** レジスタ
+
+**** 汎用レジスタ
+
+まず、
+Armv8-A の 64 ビットモード (AArch64) における汎用レジスタを説明します。
+
+Armv8-A には汎用レジスタが 31 個 (レジスタ X0〜X30) あります (図 [[fig:arm/regs]])。
+AArch64 は 64 ビットモードであり、
+当然、
+レジスタの大きさも 64 ビットです。
+Armv8-A は RISC なので、
+レジスタには無機的な名前 (X0〜X30) が付けられていて、
+(一部のレジスタを除き) それぞれのレジスタの役割は決まっていません。
+例えば、
+レジスタ X0 と X1 は対等です。
+オペランドにレジスタ X0 を指定できる命令は、
+同じように、
+オペランドにレジスタ X1 を指定することもできます。
+
+#+caption: A64 命令セットの汎用レジスタ (64 ビット \times 31 個)
+#+label: fig:arm/regs
+#+attr_latex: :width \columnwidth
+[[./figure/arm/regs.png]]
+
+#+begin_note
+「Armv8-A には 31 個の汎用レジスタがある」と聞いて、
+「え?
+31 個?
+32 個の間違いじゃないの?」
+と思ったかもしれません。
+
+通常、
+レジスタ数は 2 のべき乗 (2、
+4、
+8、
+16、
+32 ……) であるのが普通です。
+実際、
+IA-32 アーキテクチャの汎用レジスタ数は 8 で、
+COMET II の汎用レジスタ数も 8、
+AVR アーキテクチャの汎用レジスタ数も 32 でした。
+
+Armv8-A では、
+命令語のレジスタの表現に 5 ビットを用いています。
+$2^5$ = 32 なので、
+5 ビットあれば、
+命令語中に 32 種類のレジスタを指定できます。
+Armv8-A では、
+5 ビットで表現できる 32 種類のレジスタのうち、
+31 種類を汎用レジスタの指定に使用し、
+残りの 1 種類を (後ほど説明する) ゼロレジスタやスタックポインタの指定に使用します。
+Armv8-A では、
+汎用レジスタと同じように、
+ゼロレジスタもしくはスタックポインタも指定できるように、
+汎用レジスタの数が 32 - 1 = 31 種類になっています。
+#+end_note
+
+64 ビットの汎用レジスタ X0〜X30 の下位 32 ビットは、
+32 ビットの汎用レジスタ W0〜W30 としても利用できます (図 [[fig:arm/regs]])。
+例えば、
+64 用ビットのレジスタ X0 の下位 32 ビットが、
+レジスタ W0 です。
+このため、
+レジスタ X0 に 0x123456789abcdef0 が格納されている時に、
+レジスタ W0 の値を読み出すと、
+下位 32 ビットの値である 0x9abcdef0 が得られます。
+これは、
+IA-32 アーキテクチャにおいて、
+32 ビットのレジスタ EAX の下位 16 ビットをレジスタ AX としてアクセスできるのと似ています。
+
+ただし、
+32 ビットのレジスタ W0〜W30 に値を書き込んだ場合、
+64 ビットのレジスタ X0〜X30 の *上位 32 ビットは自動的にゼロでクリア* されます。
+したがって、
+例えば
+#+begin_src asm-a64
+	// X0 ← 0x123456789abcdef0
+        mov     x0, 0xdef0
+        movk    x0, 0x9abc, lsl 16
+        movk    x0, 0x5678, lsl 32
+        movk    x0, 0x1234, lsl 48
+        // W0 ← 0x12345678
+	// X0 の上位 32 ビットはゼロクリアされる
+	mov	w0, 0x5678
+	movk	w0, 0x1234, lsl 16
+#+end_src
+とすれば、
+レジスタ X0 の値は 0x1234 5678 1234 5678 では *なく*、
+0x0000 0000 1234 5678 になります。
+
+また、
+Armv8-A には、
+浮動小数点数およびベクトル演算用に、
+32 個の 128 ビットレジスタ V0〜V31 があります (図 [[fig:arm/fp-regs]])。
+レジスタ V0〜V31 は、
+データサイズの異なる浮動小数点数を格納するレジスタや、
+128 ビット中に複数のデータを格納したベクトルを格納するレジスタとして利用できます。
+64 ビットモード AArch64 におけるベクトルデータ処理のための命令は *Advanced SIMD (Neon)* や *SVE (Scalable Vector Extension; スケーラブルベクトル拡張)* と呼ばれます。
+本書では Advanced SIMD や SVE については扱いませんが、
+詳しく知りたい方は文献 \cite{Arm:Armv8-A} を参照してください。
+
+#+caption: A64 命令セットの浮動小数点/ベクトル演算用レジスタ (128 ビット \times 32 個)
+#+label: fig:arm/fp-regs
+[[./figure/arm/fp-regs.png]]
+
+Armv8-A には、
+*ゼロレジスタ (zero register)* と呼ばれる特殊なレジスタがあります。
+64 ビットのゼロレジスタは *XZR*、
+32 ビットのゼロレジスタは *WZR* と呼ばれます。
+
+これらのゼロレジスタは、
+汎用レジスタ X0〜X30 や W0〜W30 と同じようにオペランドに指定できますが、
+値は常にゼロを取ります。
+高級言語に例えると、
+汎用レジスタ X0〜X30 および W0〜W30 は変数であり、
+ゼロレジスタ XZR および WZR は常に値がゼロの定数です。
+ゼロレジスタはゼロが格納された汎用レジスタのように使えます。
+命令の宛先オペランドにゼロレジスタを指定することもできますが、
+ゼロレジスタの値は変化しません。
+
+ゼロレジスタという仕組みを初めて知ったときには「なるほど、
+世の中には頭の良い人がいるものだ」と思いました。
+というのも、
+ゼロレジスタという値が変化しないレジスタがあると、
+命令セットがすっきりするのです。
+例えば、
+レジスタ X0 に 123 を格納し、
+その値を 456 と比較する場合は、
+#+begin_src asm-a64
+        mov     x0, 123		// X0 ← 123
+        cmp     x0, 456		// X0 == 456?
+#+end_src
+のように書きます。
+命令のニーモニックから想像できる通り、
+MOV 命令はデータ転送命令であり、
+CMP 命令は比較命令です。
+
+実は、
+Armv8-A には CMP 命令という専用の命令は存在せず、
+CMP 命令は他の命令への *エイリアス (alias; 別名)* になっています。
+CMP 命令は、
+実際には減算を行う SUBS 命令のエイリアスです。
+上のプログラムは、
+以下のプログラムと等価です ( 2 つのプログラムは、
+アセンブルすると同じ機械語プログラムなります)。
+#+begin_src asm-a64
+        mov     x0, 123		// X0 ← 123
+        subs    xzr, x0, 456	// XZR ← X0 - 456
+#+end_src
+ここでは、
+「レジスタ X0 の値 - 456」を計算し、
+その結果をゼロレジスタ XZR に格納しています。
+SUBS 命令で減算を行っているので、
+減算結果に応じてフラグレジスタが設定されます。
+ただし、
+減算結果をゼロレジスタ XZR に格納しているため、
+減算結果は単に捨てられることになります。
+このように、
+ゼロレジスタを導入したことにより、
+CMP 命令という独立した命令が不要になっているのです。
+
+汎用レジスタ X0〜X30 のうち、
+レジスタ X30 は *リンクレジスタ (link register)* として使用されます。
+ゼロレジスタと同様に、
+リンクレジスタも、
+IA-32 アーキテクチャや、
+COMET II、
+AVR アーキテクチャには存在しない概念です。
+
+IA-32 アーキテクチャでも、
+COMET II でも、
+AVR アーキテクチャでも、
+サブルーチンからリターンする RET 命令は、
+スタックに格納されているリターンアドレスを取り出してジャンプします ([[sec:x86ctrl/transfer]] 節、
+[[sec:comet/ctrl]] 節、
+[[sec:avr/ctrl]] 節)。
+
+一方、
+Armv8-A アーキテクチャでは、
+サブルーチンからリターンする RET 命令は、
+レジスタ X30 に格納されているリターンアドレスにジャンプします。
+つまり、
+レジスタ X30 にリターンアドレスが格納されていることが前提であり、
+サブルーチンの呼び出し元の管理にスタックを使用しません。
+
+Armv8-A では、単に
+#+begin_src asm-a64
+	ret
+#+end_src
+とすれば、
+レジスタ X30 に格納されているリターンアドレスにジャンプします。
+リターンアドレスが、
+レジスタ X30 以外の汎用レジスタに格納されていれば、
+例えば
+#+begin_src asm-a64
+	ret	x1
+#+end_src
+のように書くこともできます。
+
+**** プログラムカウンタ、スタックポインタ
+
+Armv8-A アーキテクチャのプログラムカウンタは、
+64 ビットの *PC (Program Counter) レジスタ* です。
+汎用レジスタやスタックポインタとは異なり、
+PC レジスタの値を直接操作することはできません。
+
+スタックポインタは、
+64 ビットの *SP (Stack Pointer) レジスタ* です。
+SP レジスタの下位 32 ビットは、
+*WSP レジスタ* としてアクセスできます。
+レジスタ X0 の下位 32 ビットに W0 としてアクセスできるのと同じように、
+レジスタ SP の下位 32 ビットに WSP としてアクセスできます。
+
+**** フラグレジスタ
+
+IA-32 アーキテクチャのフラグレジスタは EFLAGS、
+COMET II では FR レジスタ、
+AVR アーキテクチャではステータスレジスタ SREG という名称でした。
+
+Armv8-A アーキテクチャのフラグレジスタは単一のレジスタではく、
+複数の特定用途向けのレジスタに格納されています。
+Armv8-A アーキテクチャでは、
+フラグレジスタを含めたステート情報を集めたものを *PSTATE (Process State)* と呼んでいます。
+PSTATE という名称の特定のレジスタやハードウェアが存在するのではなく、
+さまざまなフラグや制御ビットの総称を PSTATE と呼んでおり、
+ゼロフラグやキャリーフラグも PSTATE の一部として位置付けられています。
+
+PSTATE に含まれる主要なフラグを以下に示します。
+IA-32 アーキテクチャや AVR アーキテクチャのフラグレジスタと同じようなフラグが並んでいることがわかります。
+
+#+attr_latex: :environment maxtabular
+| フラグ | 名称                             | 動作                                                    |
+|--------+----------------------------------+---------------------------------------------------------|
+| N      | ネガティブ (negative) フラグ     | 演算結果が符号付き整数として負であれば1、そうでなければ0 |
+| Z      | ゼロ (zero) フラグ               | 演算結果がゼロであれば 1、そうでなければ 0              |
+| C      | キャリー (carry) フラグ          | 演算結果にキャリーがあれば 1、なければ 0                |
+| V      | オーバーフロー (overflow) フラグ | 演算結果がオーバフローすれば1、そうでなければ 0         |
+
+** Armv8-A A64 命令セット (概要、アドレス指定モード)
+<<sec:arm/inst>>
+
+*** 命令の分類
+
+Armv8-A の 64 ビットモード (AArch64) の命令セット (A64) には多数の命令があります。
+A64 命令のリファレンスマニュアル \cite{Arm:Armv8-A} の C6.2 節 (A64 基本命令のリスト) を機械的に処理して、
+ここに掲載されている命令のニーモニックを抽出してみました。
+
+#+begin_quote
+\small
+ADC ADCS ADD ADDG ADDS ADR ADRP AND ANDS ASR ASRV AT AUTDA AUTDB
+AUTDZA AUTDZB AUTIA AUTIA1716 AUTIASP AUTIAZ AUTIB AUTIB1716 AUTIBSP
+AUTIBZ AUTIZA AUTIZB AXFLAG B B.cond BFC BFI BFM BFXIL BIC BICS BL BLR
+BLRAA BLRAAZ BLRAB BLRABZ BR BRAA BRAAZ BRAB BRABZ BRK BTI CAS CASA
+CASAB CASAH CASAL CASALB CASALH CASB CASH CASL CASLB CASLH CASP CASPA
+CASPAL CASPL CBNZ CBZ CCMN CCMP CFINV CFP CINC CINV CLREX CLS CLZ CMN
+CMP CMPP CNEG CPP CRC32B CRC32CB CRC32CH CRC32CW CRC32CX CRC32H CRC32W
+CRC32X CSDB CSEL CSET CSETM CSINC CSINV CSNEG DC DCPS1 DCPS2 DCPS3 DGH
+DMB DRPS DSB DVP EON EOR ERET ERETAA ERETAB ESB EXTR GMI HINT HLT HVC
+IC IRG ISB LD64B LDADD LDADDA LDADDAB LDADDAH LDADDAL LDADDALB
+LDADDALH LDADDB LDADDH LDADDL LDADDLB LDADDLH LDAPR LDAPRB LDAPRH
+LDAPUR LDAPURB LDAPURH LDAPURSB LDAPURSH LDAPURSW LDAR LDARB LDARH
+LDAXP LDAXR LDAXRB LDAXRH LDCLR LDCLRA LDCLRAB LDCLRAH LDCLRAL
+LDCLRALB LDCLRALH LDCLRB LDCLRH LDCLRL LDCLRLB LDCLRLH LDEOR LDEORA
+LDEORAB LDEORAH LDEORAL LDEORALB LDEORALH LDEORB LDEORH LDEORL LDEORLB
+LDEORLH LDG LDGM LDLAR LDLARB LDLARH LDNP LDP LDPSW LDR LDRAA LDRAB
+LDRB LDRH LDRSB LDRSH LDRSW LDSET LDSETA LDSETAB LDSETAH LDSETAL
+LDSETALB LDSETALH LDSETB LDSETH LDSETL LDSETLB LDSETLH LDSMAX LDSMAXA
+LDSMAXAB LDSMAXAH LDSMAXAL LDSMAXALB LDSMAXALH LDSMAXB LDSMAXH LDSMAXL
+LDSMAXLB LDSMAXLH LDSMIN LDSMINA LDSMINAB LDSMINAH LDSMINAL LDSMINALB
+LDSMINALH LDSMINB LDSMINH LDSMINL LDSMINLB LDSMINLH LDTR LDTRB LDTRH
+LDTRSB LDTRSH LDTRSW LDUMAX LDUMAXA LDUMAXAB LDUMAXAH LDUMAXAL
+LDUMAXALB LDUMAXALH LDUMAXB LDUMAXH LDUMAXL LDUMAXLB LDUMAXLH LDUMIN
+LDUMINA LDUMINAB LDUMINAH LDUMINAL LDUMINALB LDUMINALH LDUMINB LDUMINH
+LDUMINL LDUMINLB LDUMINLH LDUR LDURB LDURH LDURSB LDURSH LDURSW LDXP
+LDXR LDXRB LDXRH LSL LSLV LSR LSRV MADD MNEG MOV MOVK MOVN MOVZ MRS
+MSR MSUB MUL MVN NEG NEGS NGC NGCS NOP ORN ORR PACDA PACDB PACDZA
+PACDZB PACGA PACIA PACIA1716 PACIASP PACIAZ PACIB PACIB1716 PACIBSP
+PACIBZ PACIZA PACIZB PRFM PRFUM PSB CSYNC PSSBB RBIT RET RETAA RETAB
+REV REV16 REV32 REV64 RMIF ROR RORV SB SBC SBCS SBFIZ SBFM SBFX SDIV
+SETF16 SETF8 SEV SEVL SMADDL SMC SMNEGL SMSUBL SMULH SMULL SSBB ST2G
+ST64B ST64BV ST64BV0 STADD STADDB STADDH STADDL STADDLB STADDLH STCLR
+STCLRB STCLRH STCLRL STCLRLB STCLRLH STEOR STEORB STEORH STEORL
+STEORLB STEORLH STG STGM STGP STLLR STLLRB STLLRH STLR STLRB STLRH
+STLUR STLURB STLURH STLXP STLXR STLXRB STLXRH STNP STP STR STRB STRH
+STSET STSETB STSETH STSETL STSETLB STSETLH STSMAX STSMAXB STSMAXH
+STSMAXL STSMAXLB STSMAXLH STSMIN STSMINB STSMINH STSMINL STSMINLB
+STSMINLH STTR STTRB STTRH STUMAX STUMAXB STUMAXH STUMAXL STUMAXLB
+STUMAXLH STUMIN STUMINB STUMINH STUMINL STUMINLB STUMINLH STUR STURB
+STURH STXP STXR STXRB STXRH STZ2G STZG STZGM SUB SUBG SUBP SUBPS SUBS
+SVC SWP SWPA SWPAB SWPAH SWPAL SWPALB SWPALH SWPB SWPH SWPL SWPLB
+SWPLH SXTB SXTH SXTW SYS SYSL TBNZ TBZ TLBI TSB CSYNC TST UBFIZ UBFM
+UBFX UDF UDIV UMADDL UMNEGL UMSUBL UMULH UMULL UXTB UXTH WFE WFET WFI
+WFIT XAFLAG XPACD XPACI XPACLRI YIELD
+#+end_quote
+なんと 468 命令です。
+IA-32 アーキテクチャと同じくらい多数の命令があります。
+
+#+begin_note
+より正確には、
+A64 基本命令のニーモニック数が 468 です。
+上で述べたように、
+これらの命令の中には、
+実際には他の命令へのエイリアス (別名) であるものも含まれます。
+#+end_note
+
+「64 ビットモードの命令 (A64) だけで 468 命令か……。
+これだけ多数の命令があると覚えられそうにないな……。」
+と思うかもしれませんが、
+話はまだ途中です。
+
+468 命令あるのは、
+A64 *基本* 命令でした。
+実はこれらの命令の他に、
+SIMD 命令や浮動小数点数命令もあります。
+これらの命令は、
+A64 命令のリファレンスマニュアル \cite{Arm:Armv8-A} の C7.2 節 (A64 高度 SIMD および浮動小数点数命令のリスト) に掲載されています。
+同じように機械的に処理して、
+これらの命令のニーモニックを抽出してみました。
+#+begin_quote
+\small
+ABS ADD ADDHN ADDHN2 ADDP ADDV AESD AESE AESIMC AESMC AND BCAX BFCVT
+BFCVTN BFCVTN2 BFDOT BFMLALB BFMLALT BFMMLA BIC BIF BIT BSL CLS CLZ
+CMEQ CMGE CMGT CMHI CMHS CMLE CMLT CMTST CNT DUP EOR EOR3 EXT FABD
+FABS FACGE FACGT FADD FADDP FCADD FCCMP FCCMPE FCMEQ FCMGE FCMGT FCMLA
+FCMLE FCMLT FCMP FCMPE FCSEL FCVT FCVTAS FCVTAU FCVTL FCVTL2 FCVTMS
+FCVTMU FCVTN FCVTN2 FCVTNS FCVTNU FCVTPS FCVTPU FCVTXN FCVTXN2 FCVTZS
+FCVTZU FDIV FJCVTZS FMADD FMAX FMAXNM FMAXNMP FMAXNMV FMAXP FMAXV FMIN
+FMINNM FMINNMP FMINNMV FMINP FMINV FMLA FMLAL FMLAL2 FMLS FMLSL FMLSL2
+FMOV FMSUB FMUL FMULX FNEG FNMADD FNMSUB FNMUL FRECPE FRECPS FRECPX
+FRINT32X FRINT32Z FRINT64X FRINT64Z FRINTA FRINTI FRINTM FRINTN FRINTP
+FRINTX FRINTZ FRSQRTE FRSQRTS FSQRT FSUB INS LD1 LD1R LD2 LD2R LD3
+LD3R LD4 LD4R LDNP LDP LDR LDUR MLA MLS MOV MOVI MUL MVN MVNI NEG NOT
+ORN ORR PMUL PMULL PMULL2 RADDHN RADDHN2 RAX1 RBIT REV16 REV32 REV64
+RSHRN RSHRN2 RSUBHN RSUBHN2 SABA SABAL SABAL2 SABD SABDL SABDL2 SADALP
+SADDL SADDL2 SADDLP SADDLV SADDW SADDW2 SCVTF SDOT SHA1C SHA1H SHA1M
+SHA1P SHA1SU0 SHA1SU1 SHA256H SHA256H2 SHA256SU0 SHA256SU1 SHA512H
+SHA512H2 SHA512SU0 SHA512SU1 SHADD SHL SHLL SHLL2 SHRN SHRN2 SHSUB SLI
+SM3PARTW1 SM3PARTW2 SM3SS1 SM3TT1A SM3TT1B SM3TT2A SM3TT2B SM4E
+SM4EKEY SMAX SMAXP SMAXV SMIN SMINP SMINV SMLAL SMLAL2 SMLSL SMLSL2
+SMMLA SMOV SMULL SMULL2 SQABS SQADD SQDMLAL SQDMLAL2 SQDMLSL SQDMLSL2
+SQDMULH SQDMULL SQDMULL2 SQNEG SQRDMLAH SQRDMLSH SQRDMULH SQRSHL
+SQRSHRN SQRSHRN2 SQRSHRUN SQRSHRUN2 SQSHL SQSHLU SQSHRN SQSHRN2
+SQSHRUN SQSHRUN2 SQSUB SQXTN SQXTN2 SQXTUN SQXTUN2 SRHADD SRI SRSHL
+SRSHR SRSRA SSHL SSHLL SSHLL2 SSHR SSRA SSUBL SSUBL2 SSUBW SSUBW2 ST1
+ST2 ST3 ST4 STNP STP STR STUR SUB SUBHN SUBHN2 SUDOT SUQADD SXTL SXTL2
+TBL TBX TRN1 TRN2 UABA UABAL UABAL2 UABD UABDL UABDL2 UADALP UADDL
+UADDL2 UADDLP UADDLV UADDW UADDW2 UCVTF UDOT UHADD UHSUB UMAX UMAXP
+UMAXV UMIN UMINP UMINV UMLAL UMLAL2 UMLSL UMLSL2 UMMLA UMOV UMULL
+UMULL2 UQADD UQRSHL UQRSHRN UQRSHRN2 UQSHL UQSHRN UQSHRN2 UQSUB UQXTN
+UQXTN2 URECPE URHADD URSHL URSHR URSQRTE URSRA USDOT USHL USHLL USHLL2
+USHR USMMLA USQADD USRA USUBL USUBL2 USUBW USUBW2 UXTL UXTL2 UZP1 UZP2
+XAR XTN XTN2 ZIP1 ZIP2
+#+end_quote
+これだけで 348 命令もあります。
+A64 基本命令と、
+高度 SIMD 命令および浮動小数点命令を合わせると、
+800 を超える命令があります。
+
+命令数が膨大なため、
+COMET II ([[ch:comet]] 章) や AVR アーキテクチャ ([[ch:avr]] 章) のように命令セットの全体像を説明するのは困難です。
+そこで、
+文献 \cite{Arm:Armv8-A} の C3. A64 Instruction Set Overview を眺めながら、
+ここに掲載されている命令の一部を、
+IA-32 アーキテクチャと同じ命令の分類に当てはめてみました (★印は、
+IA-32 アーキテクチャにおいて特に重要と思われるカテゴリです)。
+IA-32 アーキテクチャの命令分類にうまく当てはまらない命令も多いため、
+あくまで参考程度に眺めてみてください。
+
+- データ転送命令
+  - 汎用データ転送命令 ★: LDR, LDRB, LDRSB, LDRH, LDRSH, LDRSW, STR, STRB, STRH, LDUR, LDURB, LDURSB, LDURH, LDURSH, LDURSW, STUR, STURB, STURH, LDP, LDPSW, STP, LDNP, STNP, LDTP, LDTRB, LDTRSB, LDTRH, LDTRSH, LDTRSW, STTR, STTRB, STTRH, LDXR, LDXRB, LDXRH, LDXP, STXR, STXRB, STXRH, LDAR, LDARB, LDARH, STLR, STLRB, STLRH, LDAXR, LDAXRB, LDAXRH, LDAXP, STLXR, STLXRB, STLXRH, STLXP, PRFM, PRFUM, MOV, MOVZ, MOVN, MOVK, ADRP, ADR, CSEL, CSINC, CSINV, CSNEG, CSET, CSETM, CNEG
+  - 交換命令: SWP, SWPB, SWPH, CAS, CASB, CASH, CASP
+  - スタック操作命令 ★: なし
+  - 型変換命令: SXT, UXT
+- 2 進算術命令
+  - 加算命令と減算命令 ★: ADD, ADDS, SUB, SUBS, ADC, ADCS, SBC, SBCS
+  - インクリメント命令とデクリメント命令 ★: なし
+  - 比較命令と符号変更命令 ★: CMP, CMN, NEG, NEGS, NGC, NGCS, CCMN, CCMP
+  - 乗算命令と除算命令 ★: MADD, MSUB, MNEG, MUJL, SMADDL, SMSUBL, SMNEGL, SMULL, SMULH, UMADDL, UMSUBl, UMNEGL, UMULL, UMULH, SDIV, UDIV, 
+- 10 進算術命令
+  -パックド BCD 調整命令: なし
+  - アンパックド BCD 調整命令: なし
+- 論理演算命令 ★: AND, ANDS, EOR, ORR, EON, ORN
+- シフト命令とローテート命令
+  - ビットのシフト命令 ★: ASR, LSL, LSR
+  - ビットのダブルシフト命令: ASRV, LSLV, LSRV
+  - ビットのローテート命令: ROR, RORV
+- ビット命令とバイト命令
+  - ビットテストおよび変更命令: MOVI, BFM, SBFM, UBFM, BFI, XHBFXIL, SBFIZ, SBFX, UBFIZ, UBFX, EXTR, BIC, BICS, RBIT, REV, REV16, REV32
+  - ビットスキャン命令: CLS, CLZ
+  - 条件付きバイトセット命令: なし
+  - テスト命令: TST
+- 制御転送命令
+  - 無条件転送命令 ★: B, BL, BLR, BR, RET
+  - 条件付き転送命令 ★: B.cond, CBNZ, CBZ, TBNZ, TBZ
+  - ソフトウェア割込み命令: BRK, HLT, HVC, SMC, SVC, ERET
+- ストリング命令: なし
+- I/O 命令: なし
+- ENTER 命令と LEAVE 命令: なし
+- フラグ制御命令
+  - キャリーフラグおよび方向フラグ命令: CFINV, RMIF, SETF8, SETF16
+  - EFLAGS 転送命令: MRS, MSR, AXFLAG, XAFLAG
+  - 割込みフラグ命令: なし
+- セグメント・レジスタ命令
+  - セグメント・レジスタ・ロードおよびストア命令: なし
+  - far 制御転送命令: なし
+  - ソフトウェア割り込み命令: なし
+  - far ポインタロード命令: なし
+- その他の命令
+  - アドレス計算命令: なし
+  - テーブル・ルックアップ命令: なし
+  - プロセッサ識別命令: なし
+  - ノー・オペレーション命令と未定義命令 ★: NOP
+
+この分類を眺めてみると、
+Armv8-A アーキテクチャの特徴が少し見えてきます。
+ここから、
+例えば以下のようなことがわかります。
+
+- 汎用データ転送命令が多数ある。IA-32 アーキテクチャでは「何でもかんで
+  も MOV 命令」で済ませていたが、Armv8-A ではデータの型や用途ごとに多
+  数の命令ニーモニックが多数用意されている
+- スタック操作命令 (PUSH 命令や POP 命令) がない
+- インクリメント命令やデクリメント命令がない
+- ビットテストおよび変更命令が多数ある
+- 一見すると、条件付き転送命令の数が少ないように見える (実際にはB.cond
+  命令は「B.条件」という多数の命令を表している)
+- ストリング命令がない
+- Armv8-A アーキテクチャにはセグメントという概念がないため、当然ながら
+  セグメント・レジスタ命令はない
+
+Armv8-A アーキテクチャには、
+あって当然と思えるような PUSH 命令、
+POP 命令、
+INC 命令、
+DEC 命令などが存在しないのは興味深いところです。
+
+*** 命令ランキング
+
+さて、
+800 種類以上の命令が存在する Armv8-A アーキテクチャですが、
+本書の限られた紙面で、
+すべての命令を網羅的に説明することはできません。
+
+そこで本章では、
+[[sec:x86regs/ranking]] 節と同じアプローチで、
+Armv8-A アーキテクチャでよく使われる命令のランキングを作成します。
+そのランキングをもとに「利用される頻度の高い」命令だけに絞って説明します。
+
+命令ランキングの作成方法は基本的に [[sec:x86regs/ranking]] 節のものと同じです。
+今回は、
+Debian GNU/Linux 11.0 (aarch64) の /usr/bin ディレクトリ以下の実行ファイルを使用して、
+各命令の出現回数を集計しました。
+AArch64 向けの ~objdump~ コマンドの逆アセンブル結果のフォーマットが IA-32 アーキテクチャのものと異なっているため、
+集計用のシェルスクリプト ~count-inst.sh~ に一部手を加えています (図 [[fig:arm/count-inst.sh]])。
+
+#+caption: arm/count-inst.sh
+#+label: fig:arm/count-inst.sh
+#+include: "code/arm/count-inst.sh" src sh
+
+最終的に得られた命令の出現頻度ランキングは以下です。
+Armv8-A アーキテクチャの場合、
+144 種類の命令が使用されていました。
+数が多いため、
+ここでは出現頻度が 0.1% 以上のものだけを載せています。
+IA-32 アーキテクチャの命令ランキング (表 [[tab:x86regs/ranking]]) と比較してみても面白いと思います。
+
+#+caption: Debian GNU/Linux (aarch64) の /usr/bin 以下の実行ファイルで使用されている命令ランキング
+#+label: tab:arm/ranking
+#+attr_latex: :environment longtable
+| 順位 | 出現率 | 命令  |
+|------+--------+-------|
+|    1 | 19.269 | mov   |
+|    2 | 12.299 | ldr   |
+|    3 | 10.105 | add   |
+|    4 |  8.164 | bl    |
+|    5 |  6.989 | adrp  |
+|    6 |  4.938 | str   |
+|    7 |  4.362 | cmp   |
+|    8 |  3.872 | ldp   |
+|    9 |  3.789 | b     |
+|   10 |  3.440 | stp   |
+|   11 |  2.611 | cbz   |
+|   12 |  1.801 | b.eq  |
+|   13 |  1.771 | cbnz  |
+|   14 |  1.571 | br    |
+|   15 |  1.506 | ret   |
+|   16 |  1.230 | ldrb  |
+|   17 |  1.146 | b.ne  |
+|   18 |  1.061 | nop   |
+|   19 |  0.897 | sub   |
+|   20 |  0.830 | strb  |
+|   21 |  0.695 | and   |
+|   22 |  0.599 | eor   |
+|   23 |  0.432 | fmov  |
+|   24 |  0.406 | csel  |
+|   25 |  0.392 | b.ls  |
+|   26 |  0.361 | tbnz  |
+|   27 |  0.354 | orr   |
+|   28 |  0.335 | cset  |
+|   29 |  0.327 | cmn   |
+|   30 |  0.293 | b.hi  |
+|   31 |  0.280 | ccmp  |
+|   32 |  0.247 | b.le  |
+|   33 |  0.237 | movk  |
+|   34 |  0.220 | lsl   |
+|   35 |  0.187 | tbz   |
+|   36 |  0.179 | sxtw  |
+|   37 |  0.167 | b.gt  |
+|   38 |  0.162 | tst   |
+|   39 |  0.158 | lsr   |
+|   40 |  0.144 | ldrsb |
+|   41 |  0.140 | ldrh  |
+|   42 |  0.123 | b.cs  |
+|   43 |  0.111 | ror   |
+|   44 |  0.105 | blr   |
+
+Armv8-A アーキテクチャでも、
+やはりデータ転送命令である MOV や、
+算術加算命令である ADD、
+条件分岐命令である BL がランキングの上位に来ています。
+
+IA-32 アーキテクチャ (i386) 向けの Debian GNU/Linux も、
+ARM 64 ビットアーキテクチャ (aarch64) 向けの Debian GNU/Linux も、
+多くの実行ファイルは GCC でコンパイルされていると考えられるため、
+同じような傾向のランキングになっても驚くことではありません。
+
+出現頻度が 1% 以上の命令に限定すれば、
+たったの 18 個です (表 [[tab:arm/top-18]])。
+これらの命令を理解すれば、
+アセンブリ言語プログラムの 99% は読み解けそうです。
+
+#+caption: Armv8-A アーキテクチャにおいて出現頻度が 1% 以上の命令
+#+label: tab:arm/top-18
+| 順位 | 出現率 | 命令 |
+|------+--------+------|
+|    1 | 19.269 | mov  |
+|    2 | 12.299 | ldr  |
+|    3 | 10.105 | add  |
+|    4 |  8.164 | bl   |
+|    5 |  6.989 | adrp |
+|    6 |  4.938 | str  |
+|    7 |  4.362 | cmp  |
+|    8 |  3.872 | ldp  |
+|    9 |  3.789 | b    |
+|   10 |  3.440 | stp  |
+|   11 |  2.611 | cbz  |
+|   12 |  1.801 | b.eq |
+|   13 |  1.771 | cbnz |
+|   14 |  1.571 | br   |
+|   15 |  1.506 | ret  |
+|   16 |  1.230 | ldrb |
+|   17 |  1.146 | b.ne |
+|   18 |  1.061 | nop  |
+
+これらの 18 命令の分類は以下の通りです。
+
+- データ転送命令
+  - 汎用データ転送命令 ★: LDR, LDRB, STR, MOV, ADRP, LDP, STP
+- 2 進算術命令
+  - 加算命令と減算命令 ★: ADD
+  - 比較命令と符号変更命令 ★: CMP
+- 制御転送命令
+  - 無条件転送命令 ★: B, BR, BL, RET
+  - 条件付き転送命令 ★: B.EQ, B.NE, CBZ, CBNZ
+- その他の命令
+  - ノー・オペレーション命令と未定義命令 ★: NOP
+
+本書では、
+上記の 18 命令を説明します。
+それ以外の命令についてはリファレンスマニュアル \cite{Arm:Armv8-A} を参照してください。
+
+*** アドレス指定モード
+
+以下では、
+Armv8-A アーキテクチャにおける代表的な 18 命令に絞って説明します。
+このため、
+COMET II ( [[sec:comet/inst]] 節) や AVR アーキテクチャ ([[sec:avr/inst]] 節) の場合のように、
+命令のオペランドの種別を網羅的に説明するのではなく、
+18 命令を理解するのに必要な *アドレス指定モード (addressing mode)* のみに限定して説明します。
+
+Armv8-A アーキテクチャでも、
+IA-32 アーキテクチャや AVR アーキテクチャと同じように、
+命令のオペランドには、
+レジスタ、
+即値、
+メモリロケーションが指定できます。
+オペランドの数や、
+どのようなオペランドを指定できるかは、
+それぞれの命令によります。
+
+Armv8-A では、
+IA-32 アーキテクチャにおけるインテル構文や、
+AVR アーキテクチャのアセンブリ言語と同じように、
+オペランドは「宛先オペランド, 出所オペランド」の順に並びます。
+通常、
+第 1 オペランドが「宛先オペランド」です。
+
+IA-32 アーキテクチャと同じ用語で説明すれば、
+メモリロケーション (メモリ上のアドレス) の指定方法のことをアドレス指定モードと呼びます。
+Armv8-A アーキテクチャでは、
+以下のようなアドレス指定モードをサポートしています (ただし、
+どのアドレス指定モードが利用できるかは、
+命令ごとに異なります)。
+
+**** ベースレジスタのみ
+
+メモリロケーションを、
+単一のレジスタ (*ベースレジスタ (base register)*) によって指定します。
+例えば、
+#+begin_src asm-a64
+	ldr	w0, [x1]	// W0 ← [X1]
+#+end_src
+では、
+レジスタ X1 が指すメモリに格納されている 32 ビットの値を、
+レジスタ W0 に読み込みます。
+LDR (Load Register) 命令はメモリの値をレジスタに読み込む命令です。
+「これのいったいどこが『ベースレジスタ』なんだろう?」
+と疑問に思うかもしれません。
+以下に説明するように、
+Armv8-A のアドレス指定モードでは、
+単一のレジスタに加えてオフセットを指定することができます。
+上の例では、
+オフセットを指定せずに、
+基本となるレジスタのみを指定しているため (オフセットの基準を示すレジスタであるから) 「ベースレジスタ」と呼ばれています。
+
+**** ベースレジスタとオフセット
+
+ベースレジスタと *オフセット (offset)* を組み合わせてアドレスを指定する方式です。
+例を示します。
+#+begin_src asm-a64
+	ldr	w0, [x1, #12]	// W0 ← [X1 + 12]
+#+end_src
+ベースレジスタ X1 と、
+オフセットである即値 12 を指定しています。
+この例では、
+レジスタ X1 の値に、
+12 を加算したアドレスに格納されている 32 ビットの値をレジスタ W0 に読み込みます。
+
+オフセットには他のレジスタを指定することもできます。
+例えば、
+#+begin_src asm-a64
+	ldr	w0, [x1, x2]	// W0 ← [X1 + X2]
+#+end_src
+によって、
+レジスタ X1 の値に、
+レジスタ X2 の値をオフセットとして加算したアドレスに格納されている値をレジスタ W0 に読み込みます。
+
+Armv8-A のメモリの単位はバイトですが、
+表 [[tab:arm/data-type]] のようにさまざまな大きさのデータを扱います。
+そこで、
+大きさの異なるデータのアドレス指定が簡単に記述できるように、
+オフセットに左ビットシフトの回数を指定できます。
+これも例を見てみましょう。
+#+begin_src asm-a64
+	ldr	w0, [x1, x2, lsl 2]	// W0 ← [X1 + (X2 << 2)]
+#+end_src
+この場合、
+メモリロケーションには、
+レジスタ X1 の値に、
+「レジスタ X2 の値を左に 2 ビットシフトした値」を加算したものが用いられます。
+左への 2 ビットシフトは、
+レジスタ X2 の値を 4 倍することと同じです。
+
+オフセットに 32 ビットの汎用レジスタ W0〜W30 を指定することもできます。
+ただし、
+アドレスは 64 ビットですが、
+オフセットは 32 ビットなので、
+32 ビットのアドレスをどのように解釈するかを指定する必要があります。
+例を示しましょう。
+#+begin_src asm-a64
+	ldr	w0, [x1, w2, uxtx]	// W0 ← (X1 + W2)
+#+end_src
+オフセットに 64 ビットのレジスタを指定した場合と同様ですが、
+32 ビットのレジスタ W2 の値をどう解釈するか (符号なし整数か、
+符号付き整数か) を *修飾子* uxtx によって指定しています。
+
+#+begin_note
+32 ビットの値を 64 ビットに拡張する時に、
+符号なし整数か、
+符号付き整数かによって変換方法が異なるためこのようになっています。
+
+例えば、
+レジスタ X1 の値が 0x1000 0000 0000 0000 で、
+レジスタ W2 の値が 0xffff ffff であったとします。
+
+レジスタ W2 の値を符号なし整数 ($2^{32} - 1$) として解釈すれば、
+#+begin_quote
+X1 + W1 = 0x1000 0000 0000 0000 + 0xffff ffff = 0x1000 0000 ffff ffff
+#+end_quote
+となります。
+しかし、
+レジスタ W2 の値を符号付き整数 (-1) として解釈すれば
+#+begin_quote
+X1 + W1 = 0x1000 0000 0000 0000 + 0xffff ffff ffff ffff = 0x0fff ffff ffff ffff
+#+end_quote
+となります。
+コンピュータに格納されている整数のデータが、
+符号なし整数なのか、
+符号付き整数なのかはコンピュータからはわからない ([[sec:number/binary]] 節) ため、
+プログラマがデータの扱いを指定する必要があります。
+#+end_note
+
+#+caption: レジスタの型変換を指定する修飾子 (modifier)
+#+label: tab:arm/modifier
+| 修飾子 | 名称                       | 意味                               |
+|--------+----------------------------+------------------------------------|
+| uxtx   | unsigned extend doubleword | 符号なし整数として 64 ビットに拡大 |
+| sxtx   | signed extend doubleword   | 符号付き整数として 64 ビットに拡大 |
+| uxtw   | unsigned extend word       | 符号なし整数として 32 ビットに拡大 |
+| sxtw   | signed extend word         | 符号付き整数として 32 ビットに拡大 |
+
+以下のように、
+修飾子の後に即値を指定することで、
+オフセットの左ビットシフト回数もあわせて指定することもできます。
+#+begin_src asm-a64
+	ldr	w0, [x1, w2, uxtx 2]	// W0 ← [X1 + (W2 << 2)]
+#+end_src
+
+**** プリ・インデックス
+
+*プリ・インデックス (pre-index)* はオフセット付きのアドレス指定ですが、
+メモリロケーションの計算の *前* に、
+ベースレジスタに即値が加算されます。
+これも例を示します。
+#+begin_src asm-a64
+	ldr	w0, [x1, #12]!	// X1 ← <+> 12, W0 ← [X1]
+#+end_src
+出所オペランドの末尾の ~!~ が「プリ・インデックス」であることを表しています。
+この 1 命令だけで、
+1. まず、レジスタ X1 に 12 を加算する
+2. レジスタ X1 の値が指すアドレスに格納されている値をレジスタ W0 に読
+   み込む
+という処理が行われます。
+
+**** ポスト・インデックス
+
+*ポスト・インデックス (post-index)* とは、
+上のプリ・インデックスと対になるアドレス指定です。
+これもオフセット付きのアドレス指定ですが、
+メモリロケーションを確定した *あと* で、
+ベースレジスタに即値が加算されます。
+例を見てみましょう。
+#+begin_src asm-a64
+	ldr	w0, [x1], #12	// W0 ← [X1], X1 ← <+> 12
+#+end_src
+オペランドが 3 つあって、どう読めばよいのか迷いますが、
+- 宛先オペランドは ~w0~
+- 出所オペランドは ~[x1], #12~
+という構成です。
+この例では、
+1. レジスタ X1 の値が指すアドレスに格納されている値をレジスタ W0 に読
+   み込む
+2. その後、レジスタ X1 に 12 を加算する
+という処理が行われます。
+
+** Armv8-A A64 命令セット (データ転送)
+<<sec:arm/trans>>
+
+それでは、
+18 個の命令 (表 [[tab:arm/top-18]]) を順番に見てゆきましょう。
+
+まずはデータ転送命令です。
+18 個の命令のうち、
+データ転送命令は LDR、
+LDRB、
+STR、
+MOV、
+ADRP、
+LDP、
+STP の 7 つです。
+
+以下では、
+COMET II や AVR アーキテクチャの命令の説明と同じような形式で Armv8-A の命令を説明します。
+以下の表では、
+これまでと同じように、
+\r{i} や \r{j} はレジスタを表します。
+Armv8-A の場合は、
+汎用レジスタ X0〜X30、
+W0〜W30、
+スタックポインタ SP および WSP、
+ゼロレジスタ XZR および WZR を意味します。
+$c$ は即値を表します。
+$m$ はメモリロケーションを表します。
+アドレス指定モード ([[sec:arm/inst]] 節) で説明したように、
+ベースレジスタのみ、
+ベースレジスタとオフセット、
+プリ・インデックス、
+ポスト・インデックスによって決定されるメモリロケーションを意味します。
+また、
+$s$ はオペランドの大きさ (バイト単位) です。
+
+#+attr_latex: :environment maxtabular
+| ニーモニック              | 説明                                                                       |
+|---------------------------+----------------------------------------------------------------------------|
+| LDR \r{i}, $m$            | メモリの $m$ 番地に格納されている値をレジスタ \r{i} に読み込む             |
+| (Load Register)           | \r{i} ← [$m$]                                                             |
+| LDRB \r{i}, $m$           | メモリの $m$ 番地に格納されている値 (1 バイト) をレジスタ \r{i} に読み込む |
+| (Load Register Byte)      | \r{i} ← [$m$]                                                             |
+| STR \r{i}, $m$            | レジスタ \r{i} の値をメモリの $m$ 番地に書き込む                           |
+| (Store Register)          | [$m$] ← \r{i}                                                             |
+| MOV \r{i}, \r{j}          | \r{j} の値をレジスタ \r{i} に格納する                                      |
+| (Move)                    | \r{i} ← \r{j}                                                             |
+| MOV \r{i}, $c$            | 即値 $c$ をレジスタ \r{i} に格納する                                       |
+| (Move)                    | \r{i} ← $c$                                                               |
+| ADRP \r{i}, $c$           | 「現在の PC のページアドレス + $c$」を \r{i} に格納する                    |
+| (Address of Page?)        | \r{i} ← (\pc & 0xfffff000) + $c$                                          |
+| LDP \r{i}, \r{j}, $m$     | アドレスから $m$ 格納されている値を \r{i}、\r{j} に格納する                |
+| (Load Pair of Registers)  | \r{i} ← [$m$], \r{j} ← [$m + s$]                                         |
+| STP \r{i}, \r{j}, $m$     | \r{i}、\r{j} の値をアドレス $m$ から格納する                               |
+| (Store Pair of Registers) | [$m$] ← \r{i}, [$m + s$] ← \r{j}                                         |
+
+LDR (Load Register) 命令は、
+メモリに格納されている値を、
+宛先オペランドに指定したレジスタに読み込む命令です。
+LDR 命令の第 2 オペランド以降には、
+[[sec:arm/inst]] 節で説明したようなアドレス指定モードが記述できます。
+LDR 命令の例をいくつか示します。
+#+begin_src asm-a64
+	ldr     w2, [x1, 4]		// W2 ← [X1 + 4]
+	ldr     x30, [sp], 16		// X30 ← [SP], SP ← <+> 16
+	ldr     w4, [x1, w2, sxtw 2]	// W4 ← [X1 + (W2 << 2])
+#+end_src
+Armv8-A では、
+アドレス指定モードの記述法に少し癖があるため、
+最初は読みづらいかもしれませんが、
+しばらく読んでいると慣れてくると思います。
+- 角括弧 (~[~ と ~]~) が登場すればそれはメモリロケーション
+- 角括弧 (~[~ と ~]~) の中はベースレジスタとオフセット
+- 末尾に ~!~ が付けば、それはプリ・インデックス
+- 角括弧 (~[~ と ~]~) の後に即値があれば、それはポスト・インデックス
+というのを頭に入れながら読んでみてください。
+
+LDRB (Load Register Byte) 命令は LDR 命令とほぼ同じですが、
+オペランドで指定されたメモリロケーションに格納されている 1 バイトのみを読み込みます。
+
+LDR 命令の対になる命令が、
+STR (Store Register) 命令です。
+STR 命令では、
+他の多くの命令とは異なり、
+第 1 オペランドが出所オペランドであり、
+第 2 オペランド以降が宛先オペランド (メモリロケーション) であることに注意してください。
+STR 命令のメモリロケーションに指定できるアドレス指定モードは LDR 命令のアドレス指定モードと同じです。
+STR 命令の例をいくつか示します。
+#+begin_src asm-a64
+	str     w2, [x1, 4]		// [X1 + 4] ← W2
+	str     x30, [sp, 16]		// [SP + 16] ← X30
+	str     x30, [sp, -16]!		// SP ← <-> 16, [SP] ← X30
+	str     w4, [x1, w0, sxtw 2]	// [X1 + (W0 << 2]) ← W4
+#+end_src
+LDR 命令が読めれば、
+STR 命令も苦労なく読めることでしょう。
+
+レジスタからレジスタへの値のコピーや、
+レジスタに即値を読み込むための命令が MOV (Move) 命令です。
+MOV 命令は、
+オペランドにメモリロケーションを取りません (メモリから読み込んだり、
+メモリに書き込んだりすることはできません)。
+したがって、
+MOV 命令のオペランドは単純なものばかりです。
+MOV 命令の例を示します。
+#+begin_src asm-a64
+	mov     w2, 123		// W2 ← 123
+	mov     w2, 456		// W2 ← 456
+	mov     w0, w20		// W0 ← W20
+	mov     w20, w0		// W20 ← W0
+#+end_src
+
+ADRP 命令は、
+現在のプログラムカウンタの値を取得するための命令です。
+ただし、
+プログラムカウンタの値そのものではなく、
+4 K バイト単位のアドレスを取得します (つまり、
+下位 12 ビットは 0 で埋められます)。
+第 1 オペランドに指定したレジスタには、
+4 K バイト単位のアドレスに、
+第 2 オペランドに指定した即値が加算されます。
+
+と聞いても、
+何のことかよくわからないかもしれないので、
+ADRP 命令の実際の利用例を紹介します。
+#+begin_src asm-a64
+        adrp    x0, .LANCHOR0		// X0 ← .LANCHOR0 のページアドレス
+        add     x1, x0, :lo12:.LANCHOR0	// X1 ← .LANCHOR0 のアドレス
+	:
+	:
+	.bss				// .bss セクションの開始
+        .set    .LANCHOR0,. + 0		// .LANCHOR0 = 現在のアドレス
+i:
+        .zero   4
+#+end_src
+
+[[sec:arm/gas]] 節で述べように、
+Armv8-A アーキテクチャは RISC であり、
+すべての命令語長は 32 ビットです。
+このため、
+メモリのアドレス (大きさは 64 ビット) を即値として命令語に含めることができません。
+このため、
+メモリのアドレスを 16 ビットずつ格納するなどの工夫が必要でした。
+
+そこで、
+#+begin_quote
+メモリの絶対アドレス (64 ビット) を扱うのが大変なら、
+現在のプログラムカウンタを基準とした相対アドレス (64 ビットよりははるかに小さくて済むはず) を使おう
+#+end_quote
+とうことを考えます。
+
+上の例では、
+.bss セクションの冒頭にある、
+ラベル ~i~ のアドレスを取得するために、
+ADRP 命令と ADD 命令を使用しています。
+#+begin_src asm-a64
+        adrp    x0, .LANCHOR0		// X0 ← .LANCHOR0 のページアドレス
+        add     x1, x0, :lo12:.LANCHOR0	// X1 ← .LANCHOR0 のアドレス
+#+end_src
+上記の 2 命令によって、
+レジスタ X1 に ~.LANCHOR0~ のアドレスが格納されます。
+最初の
+#+begin_src asm-a64
+        adrp    x0, .LANCHOR0		// X0 ← .LANCHOR0 のページアドレス
+#+end_src
+によって、
+~.LANCHOR0~ のページアドレス (~.LANCHOR0~ のアドレスが存在する 4 K バイト単位のページの先頭のアドレス) がレジスタ X0 に格納されます。
+
+#+begin_note
+ADRP 命令の第 2 オペランドは ~.LANCHOR0~ ですが、
+これは、
+GAS によるアセンブル時に適切なオフセットに変換されます。
+つまり、
+上記のプログラムをアセンブルすると、
+機械語には ~.LANCHOR0~ のメモリアドレスが格納されるのではなく、
+「~.LANCHOR0~ のアドレス - ADRP 命令が配置されるアドレス」のオフセットが格納されます。
+#+end_note
+次の
+#+begin_src asm-a64
+        add     x1, x0, :lo12:.LANCHOR0	// X1 ← .LANCHOR0 のアドレス
+#+end_src
+によって、
+レジスタ X0 の値に、
+~.LANCHOR0~ のアドレスのページの先頭からのオフセットが加算され、
+計算結果がレジスタ X1 に格納されます。
+~:log12:~ は下位 12 ビットを取り出す修飾子 (表 [[tab:arm/reloc]]) です。
+
+やはり何のことかわからないかもしれませんが、
+要は
+- ADRP 命令の即値に、覚えておきたいメモリの絶対アドレスではなく *相対ア
+  ドレス* を記録しておく
+- ADRP 命令と ADD 命令を組み合わせれば、プログラム実行時に、覚えておい
+  たメモリのアドレスをレジスタに読み出せる
+ということです。
+
+LDP (Load Pair of Registers) 命令と STP (Store Pair of Registers) 命令も珍しいタイプの命令です。
+これらもロード命令とストア命令の一種ですが、
+メモリに連続して格納されている 2 つの値を読み込んだり、
+2 つのレジスタの値をメモリに連続して書き込んだりすることができます。
+
+LDP 命令と STP 命令の例を示します。
+#+begin_src asm-a64
+stp     x19, x20, [sp, -16]!	// push X20, push X19
+ldp     x19, x20, [sp], 16	// pop X19, pop X20
+#+end_src
+最初の STP 命令は、
+レジスタ X19 および X20 の値をスタックにプッシュしています。
+次の LDP 命令は、
+さきほどとは逆に、
+スタックの値をレジスタ X19 および X20 にポップしています。
+
+Armv8-A には、
+スタック操作のための PUSH 命令や POP 命令がありませんが、
+プリ・インデックスやポスト・インデックスのアドレス指定モードを利用することで、
+スタック操作を実現できます。
+
+この例では、
+さらに LDP 命令や STP 命令とアドレス指定モードを組み合わせて、
+2 つの値を連続してスタックにプッシュおよびスタックからポップしています。
+最初の
+#+begin_src asm-a64
+stp     x19, x20, [sp, -16]!	// push X20, push X19
+#+end_src
+は、
+プリ・インデックスのアドレス指定なので、
+最初にスタックポインタの値が 16 だけ減算されます。
+スタックポインタを減らして、
+スタックに空きを確保したあとで、
+スタックのトップから 64 ビットのレジスタの値 (X19 および X20) を書き込みます。
+64 ビットの値が 2 つ、
+つまりちょうど合計 16 バイトです。
+次の
+#+begin_src asm-a64
+ldp     x19, x20, [sp], 16	// pop X19, pop X20
+#+end_src
+は、
+さきほどとまったく逆の処理を行っています。
+ポスト・インデックスのアドレス指定なので、
+まず、
+スタックポインタが指すアドレスから、
+64 ビットの値を 2 つ読み込み、
+それぞれをレジスタ X19 と X20 に格納します。
+その後、
+スタックポインタの値を 16 だけ増やします。
+これにより、
+スタックのトップに格納されていた 64 ビットのデータが 2 つ、
+スタックからポップされることになります。
+
+** Armv8-A A64 命令セット (算術演算、論理演算)
+<<sec:arm/arith>>
+
+*** 算術演算命令
+
+18 個の命令 (表 [[tab:arm/top-18]]) のうち、
+算術演算命令は ADD のみです。
+
+| ニーモニック            | 説明                                      |
+|-------------------------+-------------------------------------------|
+| ADD \r{i}, \r{j}, \r{k} | \r{j} + \r{k} をレジスタ \r{i} に格納する |
+| (Add)                   | \r{i} ← \r{j} + \r{k}                    |
+| ADD \r{i}, \r{j}, $c$   | \r{j} + $c$ をレジスタ \r{i} に格納する   |
+| (Add)                   | \r{i} ← \r{j} + $c$                      |
+
+ADD (Add) 命令はオペランドを 3 つ取ります。
+第 2 オペランドと第 3 オペランドを加算した結果を、
+第 1 オペランドに格納します。
+IA-32 アーキテクチャや、
+COMET II、
+AVR アーキテクチャでは、
+ADD 命令のオペランドは 2 つでした。
+Armv8-A アーキテクチャの ADD 命令では、
+オペランドは必ず 3 つ必要です。
+3 番目のオペランドは省略できません。
+
+RISC である AVR アーキテクチャと同じように、
+ADD 命令のオペランドには *メモリロケーションは指定できません*。
+メモリ上に格納されている値に対して算術演算を行う場合には、
+まず、
+メモリ上の値を LDR 命令等でレジスタに読み込んで、
+その後に必要な算術演算を行います。
+演算結果をメモリに格納したい場合は、
+レジスタが保持している演算結果を、
+別途 STR 命令等でメモリに格納する必要があります。
+
+Armv8-A アーキテクチャの ADD 命令の最大の特徴は、
+ADD 命令を実行しても PSTATE の *フラグ N/Z/C/V は変化しない* という点です。
+ADD 命令は算術演算命令ですが、
+ADD 命令を実行してもゼロフラグやキャリーフラグが設定されません。
+演算結果に応じてフラグを変化させたい場合には、
+ADD 命令ではなく、
+ADDS (Add, Setting Flags) 命令を使用します。
+
+ADD 命令の例を示します。
+#+begin_src asm-a64
+	add     w2, w2, 1		// W2 ← <+> 1
+	add     w20, w20, w19		// W20 ← W20 + W19
+	add     x0, x0, :lo12:.LC0	// X0 ← X0 + .LC0 & 0x0fff
+#+end_src
+
+ADD 命令では、
+オペランドに大きさの異なるレジスタ (例えば 64 ビットのレジスタと 32 ビットのレジスタ) を混在させることもできます。
+その場合は、
+表 [[tab:arm/modifier]] のような修飾子を指定する必要があります。
+詳細については文献 \cite{Arm:Armv8-A} を参照してください。
+
+*** 比較演算命令
+
+18 個の命令 (表 [[tab:arm/top-18]]) のうち、
+比較演算命令は CMP 命令だけです。
+
+| ニーモニック     | 説明                                             |
+|------------------+--------------------------------------------------|
+| CMP \r{i}, \r{j} | \r{i} と \r{k} を比較する                        |
+| (Compare)        | 演算結果に応じて N、\zf、\cf、V フラグを設定する |
+| CMP \r{i}, $c$   | \r{i} と $c$ を比較する                          |
+| (Compare)        | 演算結果に応じて N、\zf、\cf、V フラグを設定する |
+
+CMP 命令はオペランドを 2 つ取ります。
+第 1 オペランドと第 2 オペランドの値を比較し、
+その結果に応じて PSTATE を設定します。
+フラグ N、
+Z、
+C、
+V の変化は、
+IA-32 アーキテクチャや AVR アーキテクチャとおおよそ同じです。
+
+CMP 命令のオペランドは、
+ADD 命令の第 2 および第 3 オペランドと同じ種類のものが指定できます。
+したがって、
+ADD 命令と同じように大きさの異なるレジスタを混在させることもできます。
+
+これは、
+[[sec:arm/arch]] 節で述べたように、
+CMP 命令は SUBS (Subtract, Setting Flags) 命令へのエイリアスであることからもわかります。
+つまり例えば、
+#+begin_src asm-a64
+	cmp	x0, x7		// X0 == X7?
+#+end_src
+という CMP 命令は、アセンブラによって
+#+begin_src asm-a64
+	subs	xzr, x0, x7	// XZR ← X0 - X7
+#+end_src
+と同じ機械語に変換されるのです。
+
+CMP 命令は SUBS 命令のエイリアスであり、
+SUBS 命令と ADD 命令はどちらも算術演算命令なので、
+同じ形式のオペランドが指定できます。
+そのため、
+ADD 命令の第 2 および第 3 オペランドと、
+CMP 命令の第 1 および第 2 オペランドには同じ種類のものが指定できます。
+
+*** シフト演算命令
+
+シフト命令は、
+ランキングの上位 18 個の命令 (表 [[tab:arm/top-18]]) には入っていません。
+シフト命令のうち、
+LSL (Logical Shift Left) 命令がようやくランキングの 34 位に入っています。
+ただし、
+LSL 命令の出現率はたったの 0.22 % です。
+
+[[sec:arm/inst]] 節で述べたように、
+Armv8-A のアドレス指定モードでは、
+即値やレジスタで指定するオフセットに、
+左ビットシフトの回数を指定できます。
+このように、
+アドレス指定モードの一部としてビットシフトが可能であるため、
+Armv8-A アーキテクチャでは別途ビットシフトが必要となる機会が少ないのだと思われます。
+
+** Armv8-A A64 命令セット (実行制御)
+<<sec:arm/ctrl>>
+
+*** 分岐命令
+
+18 個の命令 (表 [[tab:arm/top-18]]) のうち、
+分岐命令は B、
+B.EQ、
+B.NE、
+CBZ、
+CBNZ の 5 つです。
+B 命令のみ無条件分岐命令で、
+それ以外の命令は条件分岐命令です。
+
+#+attr_latex: :environment maxtabular
+| ニーモニック                    | 説明                                                             |
+|---------------------------------+------------------------------------------------------------------|
+| B $c$                           | 現在の \pc から $c$ だけ相対ジャンプする                         |
+| (Branch)                        | \pc ← <+> $c$                                                   |
+| B.EQ $c$                        | \zf が 1 であれば、現在の \pc から $c$ だけ相対ジャンプする      |
+| (Branch if Equal)               | \pc ← <+> $c$ if \zf == 1                                       |
+| B.NE $c$                        | \zf が 0 であれば、現在の \pc から $c$ だけ相対ジャンプする      |
+| (Branch if Not Equal)           | \pc ← <+> $c$ if \zf == 0                                       |
+| CBZ \r{i}, $c$                  | \r{i} がゼロであれば、現在の \pc から $c$ だけ相対ジャンプする   |
+| (Compare and Branch on Zero)    | \pc ← <+> $c$ if \r{i} == 0                                     |
+| CBNZ \r{i}, $c$                 | \r{i} がゼロでなければ、現在の \pc から $c$ だけ相対ジャンプする |
+| (Compare and Branch on Nonzero) | \pc ← <+> $c$ if \r{i} != 0                                     |
+
+B (Branch) 命令は無条件の *相対ジャンプ命令* です。
+オペランドに即値として指定したオフセットだけ、
+現在のプログラムカウンタから相対ジャンプします。
+B 命令は、
+オペランドにジャンプ先のアドレスを指定するのではなく、
+現在のプログラムカウンタの値を基準として、
+前後 128 M バイト以内のオフセットへジャンプします。
+
+Armv8-A アーキテクチャでは、
+すべての命令語長は 32 ビットでした。
+このため、
+それぞれの機械語の命令が格納されているメモリのアドレスは *必ず 4 の倍数になります*。
+例えば、
+機械語のプログラムがメモリの 0x8000 番地から格納されているとすると、
+| 1 番目の命令は 0x8000 番地 |
+| 2 番目の命令は 0x8004 番地 |
+| 3 番目の命令は 0x8008 番地 |
+| 4 番目の命令は 0x800c 番地 |
+| 5 番目の命令は 0x8010 番地 |
+のように、
+必ず 4 番地おきに配置されます。
+
+したがって、
+B 命令で相対ジャンプする時のオフセットは、
+必ず 4 の倍数になります。
+例えば、
+現在のプログラムカウンタを基準として、
++4 番地や、
+-8 番地、
+-12 番地や +16 番地にジャンプする可能性はありますが、
++3 番地や、
+-7 番地、
+-11 番地や +15 番地にジャンプすることはありません。
+このため B 命令の相対ジャンプに用いるオフセットも必ず 4 の倍数です。
+このため、
+B 命令の機械語の即値には、
+*オフセットを 1/4 倍した値* (右に 2 ビットシフトした値) が格納されます。
+
+B 命令の例を示します。
+#+begin_src asm-a64
+	b       .L3	// PC ← <+> オフセット (自動で計算される)
+	b	4	// PC ← <+> 4
+	b	-12	// PC ← <+> -12
+#+end_src
+通常は、
+1 番目の例のように、
+B 命令のオペランドにはジャンプ先のラベルを指定します。
+B 命令が使用するオフセットの計算はアセンブラが自動的に行います。
+
+ここで、
+「B 命令のオフセットには \pm 128 M バイト以内しか指定できないなら、
+ジャンプ先のラベルがそれ以上離れていたら困るのでは?」
+と思うかもしれません。
+これは例えば、
+以下のようなプログラム (図 [[fig:arm/b.s]]) の場合です。
+
+#+caption: arm/b.s
+#+label: fig:arm/b.s
+#+include: "code/arm/b.s" src asm-a64
+
+このプログラム中の B 命令のうち、
+#+begin_src asm-a64
+	b       _start          // _start へジャンプ                                                    
+	b       -4              // これも _start へのジャンプ                                           
+#+end_src
+は現在のプログラムカウンタのすぐ近くへのジャンプなので問題ありません。
+問題はその次の B 命令です。
+#+begin_src asm-a64
+	b       far_v           // 128 Mバイト以上先にジャンプ (できない)                               
+
+	.zero   0x08000000      // 128 M バイト分をゼロで埋める                                         
+far_v:  .zero   1               // 1 バイトの領域を確保                                                 
+#+end_src
+GAS の疑似命令 .zero によって、
+メモリ上に 128 M バイト (= 0x0800 0000) を確保しています。
+このため、
+ラベル ~far_v~ は、
+B 命令から 128 M バイト以上離れてしまっています (B 命令の大きさが 4 バイトなので、
+オフセットの大きさは 128 M バイト + 4 バイトです)。
+
+アセンブルできるか試してみしょう。
+本書では、
+IA-32 アーキテクチャの Debian GNU/Linux 上で、
+QEMU エミュレータを使用して AArch64 のプログラムを実行しています ([[sec:arm/overview]] 節)。
+このため、
+GAS も、
+IA-32 アーキテクチャ向けのアセンブラである ~as~ コマンドではなく、
+AArch64 向けのアセンブラである ~aarch64-linux-gnu-as~ を使います (図 [[fig:arm/b.log]])。
+
+#+caption: arm/b.log
+#+label: fig:arm/b.log
+#+include: "code/arm/b.log" src raw
+
+B 命令のオペランドに指定できるオフセットは前後 128 M バイト以内のため、
+「b.s:7: Error: branch out of range」というエラーが表示され、
+アセンブルに失敗しています。
+
+これはこれで納得できる挙動ですが、
+今度は次のような別の疑問が生じます。
+#+begin_quote
+アセンブリ言語のプログラム中に、
+\inst{B foo} というジャンプ命令を記述した場合、
+ラベル ~foo~ の値はアセンブル時にわかっているとは限らない。
+例えば、
+ラベル ~foo~ は、
+他のオブジェクトファイル中で定義されている大域シンボルかもしれない。
+ラベル ~foo~ の値がアセンブル時にわからない時に、
+GAS は B 命令をどうやってアセンブルするのだろう?
+#+end_quote
+
+実際にプログラムを書いて、
+GAS の動作を確認してみましょう。
+
+さきほどのプログラム ~b.s~ (図 [[fig:arm/b.s]]) と同じようなプログラム ~b-to-data.s~ (図 [[fig:arm/b-to-data.s]]) ですが、
+B 命令の相対ジャンプ先が .data セクション中のラベルになっています。
+
+#+begin_note
+コンピュータの素晴らしいところは、
+「わからないことがあったら、
+プログラムを書いて、
+中身を見て、
+とことんまで調べられる」という点です。
+
+Web の検索エンジンで「gas arm b 命令ラベル」等で調べるのも 1 つの方法ですが、
+インターネット上の情報は玉石混交、
+というか、
+ほとんどが「石」です。
+Web の検索エンジンでは、
+「運が良ければ探している情報が見つかるかもしれない」という状況です。
+
+やみくもに Web を検索するのではなく、
+目の前で動いているコンピュータやソフトウェアの中身を見てみましょう。
+もしわからないことがあったら、
+実験して、
+ソースコードを読んで、
+逆アセンブルして、
+デバッガで追いかければ、
+必ず探している答えが見つかります。
+
+[[sec:gas/overview]] 節で述べたように、
+プロプライエタリなソフトウェアではこういったことが自由にできません。
+みなさんの「研究・探究する自由」を実現するためにも、
+自由なソフトウェアを普段から使用することをおすすめします。
+#+end_note
+
+#+caption: arm/b-to-data.s
+#+label: fig:arm/b-to-data.s
+#+include: "code/arm/b-to-data.s" src asm-a64
+
+このプログラムでは、
+#+begin_src asm-a64
+	b       v               // .data セクションへの相対ジャンプ (できるか?)
+#+end_src
+によって、
+.data セクション中のラベル ~v~ にジャンプしていますが、
+ラベル ~v~ の値はこのプログラムのアセンブル時には不明です。
+ラベル ~v~ の値は、
+最終的にリンカによって決定されるからです。
+
+ファイル ~b-to-data.s~ をアセンブルおよびリンクしてみます。
+#+begin_src sh
+$ aarch64-linux-gnu-as -o b-to-data.o b-to-data.s
+$ aarch64-linux-gnu-ld -o b-to-data b-to-data.o
+#+end_src
+GAS によるアセンブルも、
+~ld~ コマンドによるリンクも無事成功しました。
+
+どのような機械語のプログラムに変換されたかを見てみましょう。
+まず、
+ラベル ~_start~ や ~v~ は、
+最終的にどんなアドレスになったでしょうか。
+objdump コマンドでシンボルテーブルを表示します。
+#+begin_src sh
+$ aarch64-linux-gnu-nm b-to-data
+00000000004100bd D __bss_end__
+00000000004100bd D __bss_start
+00000000004100bd D __bss_start__
+00000000004100c0 D __end__
+00000000004100bd D _bss_end__
+00000000004100bd D _edata
+00000000004100c0 D _end
+00000000004000b0 T _start
+00000000004100bc d v
+#+end_src
+今回、
+IA-32 アーキテクチャのコンピュータ上で、
+Armv8-A アーキテクチャ向けのプログラムをアセンブルしているため、
+通常の ~objdump~ コマンドではなく、
+~aarch64-linux-gnu-nm~ コマンドを使用していることに注意します。
+
+ラベル ~_start~ と ~v~ の値は
+#+begin_src raw
+00000000004000b0 T _start
+00000000004100bc d v
+#+end_src
+となっています。
+2 つのアドレスの差はおおよそ 64 K バイトです。
+(幸いにして) B 命令で相対ジャンプできるオフセットの範囲内 (\pm 128 M バイト以内) に十分収まっています。
+
+最終的に B 命令がどのような機械語になったかを見てみましょう。
+objdump コマンドを使って、
+実行ファイル ~b-to-data~ を逆アセンブルします。
+リンクされる前のオブジェクトファイル ~b-to-data.o~ ではなく、
+リンクされた後の実行ファイル ~b-to-data~ を逆アセンブルすることに注意してください。
+#+begin_src raw
+$ aarch64-linux-gnu-objdump -d b-to-data
+
+b-to-data:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+00000000004000b0 <_start>:
+  4000b0:       14000000        b       4000b0 <_start>
+  4000b4:       17ffffff        b       4000b0 <_start>
+  4000b8:       14004001        b       4100bc <v>
+#+end_src
+
+無事にアセンブルできたことがわかります。
+逆アセンブル結果の
+#+begin_src asm-a64
+  4000b8:       14004001        b       4100bc <v>
+#+end_src
+より、
+0x14、
+0x00、
+0x40、
+0x01 という 4 バイトの機械語に変換されたことがわかります。
+B 命令のオペランド (即値) は 32 ビットの機械語の下位 26 ビットなので、
+今の場合、
+オフセットの値は 0x4001 です。
+B 命令は、
+オフセットを 1/4 倍した値を即値に格納するため、
+実際に相対ジャンプに用いられるオフセットは、
+0x4001 を 4 倍した 0x4001 \times 4 = 0x10004 = 65 540 バイトです。
+正しく、
+約 64 K バイト先の .data セクションにジャンプしていることがわかります。
+
+しかし、
+次々と謎が謎を呼びます。
+上の結果を見ると、
+以下ような疑問を持ちます。
+#+begin_quote
+今のケースだと、
+たまたまラベル ~_start~ と ~v~ のアドレスが近くに配置されたから良かっただけで、
+毎回、
+近くのアドレスに配置されるとは限らないはず。
+
+GAS やリンカの動作は、以下のどれだろうか?
+
+1. リンカがメモリ配置を工夫している
+
+  リンカが、
+  リンク時にオブジェクトファイル中の相対ジャンプの有無を  検出する。
+  相対ジャンプが使われていれば、
+  相対ジャンプでジャンプできる範囲内 (\pm 128 M バイト以内) に収まるように、
+  うまくオブジェクトをメモリ上に配置する。
+
+2. リンク時に相対ジャンプの可否を判定して、不可ならリンクに失敗する
+
+  リンカは、
+  リンク時に相対ジャンプのオフセットを計算して、
+  B 命令のオペランドの即値値を確定させる。
+  しかし、
+  オフセットの値が \pm 128 M バイトを超えるとリンク時にエラーを  表示して、
+  実行ファイルの作成に失敗する。
+
+3. それ以外の何かをしている
+
+  上記の 1. や 2. のどちらでもなく、
+  何かそれ以外の工夫をしている。
+#+end_quote
+
+みなさんはどれが正解だと思いますか?
+
+これもやはり、
+実際にプログラムを書いて調べてみましょう。
+さきほどのプログラム ~b-to-data.s~ (図 [[fig:arm/b-to-data.s]]) とほとんど同じですが、
+.data セクションの先頭に 128 M バイトの領域を確保している ~b-to-large-data.s~ です (図 [[fig:arm/b-to-large-data.s]])。
+
+#+caption: arm/b-to-large-data.s
+#+label: fig:arm/b-to-large-data.s
+#+include: "code/arm/b-to-large-data.s" src asm-a64
+
+ラベル ~v~ のアドレスは、
+.data セクションの先頭から 128 M バイトに位置します。
+したがって、
+さきほど (図 [[fig:arm/b-to-data.s]] の場合) のように「.text セクション→ .data セクション」の順にメモリに配置されると相対ジャンプできません (オフセットが 128 M バイトを超えてしまいます)。
+
+配置する順序を逆にして、
+「.data セクション→ .text セクション」の順にメモリに配置できると、
+(ラベル ~v~ は .data セクションの末尾にあるため) 相対ジャンプできそうです。
+
+アセンブルおよびリンクしてみましょう。
+#+begin_src sh
+$ aarch64-linux-gnu-as -a  -o b-to-large-data.o b-to-large-data.s
+$ aarch64-linux-gnu-ld  -o b-to-large-data b-to-large-data.o
+#+end_src
+特に警告やエラーが表示されることなく、
+無事、
+実行ファイル ~b-to-large-data~ が生成されました。
+さきほどと同じように、
+ラベル ~_start~ および ~v~ のアドレスを見てみます。
+#+begin_src sh
+$ aarch64-linux-gnu-nm b-to-large-data
+00000000004000c8 t ___veneer
+00000000084100e1 D __bss_end__
+00000000084100e1 D __bss_start
+00000000084100e1 D __bss_start__
+00000000084100e8 D __end__
+00000000084100e1 D _bss_end__
+00000000084100e1 D _edata
+00000000084100e8 D _end
+00000000004000b0 T _start
+00000000084100e0 d v
+#+end_src
+先ほどと変わらず、
+「.text セクション→ .data セクション」の順にメモリに配置されています。
+2 つのラベルのアドレスは
+#+begin_src raw
+00000000004000b0 T _start
+00000000084100e0 d v
+#+end_src
+なので、
+アドレスの差は 0x841 00e0 - 0x040 00b0 = 0x801 0030 (= 約 128.1 M バイト) です。
+オフセットが 128 M バイトを超えているため、
+B 命令ではジャンプできないはずです。
+
+一体、
+何が起こっているのでしょうか?
+実行ファイル ~b-to-large-data~ を逆アセンブルしてみましょう。
+#+begin_src asm-a64
+$ aarch64-linux-gnu-objdump -d b-to-large-data
+
+b-to-large-data:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+00000000004000b0 <_start>:
+  4000b0:       14000000        b       4000b0 <_start>
+  4000b4:       17ffffff        b       4000b0 <_start>
+  4000b8:       14000004        b       4000c8 <___veneer>
+  4000bc:       d503201f        nop
+  4000c0:       14000008        b       4000e0 <___veneer+0x18>
+  4000c4:       d503201f        nop
+
+00000000004000c8 <___veneer>:
+  4000c8:       90040090        adrp    x16, 8410000 <___veneer+0x800ff38>
+  4000cc:       91038210        add     x16, x16, #0xe0
+  4000d0:       d61f0200        br      x16
+	:
+	:
+#+end_src
+
+元のアセンブリ言語のプログラムは
+#+begin_src asm-a64
+	b	v		// .data セクションへの相対ジャンプ (できるか?)
+#+end_src
+でしたが、
+これに対応する実行ファイル中の機械語は
+#+begin_src asm-a64
+  4000b8:       14000004        b       4000c8 <___veneer>
+	:
+	:
+00000000004000c8 <___veneer>:
+  4000c8:       90040090        adrp    x16, 8410000 <___veneer+0x800ff38>
+  4000cc:       91038210        add     x16, x16, #0xe0
+  4000d0:       d61f0200        br      x16
+#+end_src
+となっています。
+何が起こっているかわかるでしょうか?
+
+これはつまり、
+リンカがラベル (大域シンボル) のアドレスを決定する時に、
+#+begin_quote
+もし相対ジャンプのジャンプ先が届かない (\pm 128 M バイトを超える) アドレスになっていたら、
+機械語のプログラム中に (元のアセンブリ言語プログラムには存在しなかった) 新しく機械語の命令を追加し、
+BR 命令による間接アドレス参照によってジャンプできるようにしている。
+#+end_quote
+ということを意味します。
+
+#+begin_note
+BR (Branch to Register) 命令は、
+オペランドに指定したレジスタに格納されているアドレスに絶対ジャンプする無条件分岐命令です。
+#+end_note
+
+ラベル ~___veneer~ も、
+そこに配置されている
+#+begin_src asm-a64
+00000000004000c8 <___veneer>:
+  4000c8:       90040090        adrp    x16, 8410000 <___veneer+0x800ff38>
+  4000cc:       91038210        add     x16, x16, #0xe0
+  4000d0:       d61f0200        br      x16
+#+end_src
+という 3 命令も、
+*リンカによって* 自動的に生成されたものです。
+B 命令の相対ジャンプではラベル ~v~ までジャンプできない (届かない) ため、
+- B 命令のジャンプ先を、ラベル ~__veneer~ に書き換える
+- ラベル ~__veneer~ からの 3 命令で、BR 命令を使用して、ラベル ~v~ の
+  アドレスにジャンプする
+という仕組みになっています。
+データ転送命令のところ ([[sec:arm/trans]] 節) で説明したように、
+ADRP 命令と ADD 命令の 2 命令の組み合わせは、
+メモリの絶対アドレスをレジスタに取得する定型句でした。
+
+#+begin_note
+英語の veneer は「化粧板、
+薄板」という意味です。
+ベニヤ板の「ベニヤ」を意味する名詞です。
+B 命令の相対ジャンプでは直接ジャンプできない (届かない) 時に、
+薄板 (ベニア) を間に挟むことで、
+「まず薄板に相対ジャンプ→薄板からジャンプ先へジャンプ」とすることで遠くへのジャンプを実現しています。
+#+end_note
+
+#+begin_note
+これは、
+「GAS やリンカが賢いため、
+プログラマにとって面倒な作業を、
+あれこれ裏で肩代わりにしてくれている」と言うことができます。
+しかし同時に、
+「GAS やリンカは、
+プログラマの知らない (気付かない) ところで機械語プログラムをあれこれ書き換えてしまっている」と言うこともできます。
+
+アセンブリ言語のプログラムを機械語に変換し、
+生成された機械語のプログラムをデバッガでトレースすると、
+元のアセンブリ言語のプログラムには存在しない命令が存在し、
+元のアセンブリ言語のプログラムとは異なるロジックで動作しています。
+今回のケースに限らず、
+「あれ、
+どうなっているんだろう?」
+という疑問が起きた時には、
+ドキュメントを読むのはもちろんのこと、
+アセンブラ、
+逆アセンブラ、
+デバッガなどのツールを駆使して調べてみましょう。
+#+end_note
+
+続いて、
+条件分岐命令を説明します。
+
+B.EQ (Branch if Equal) 命令と B.NE (Branch if Not Equal) 命令は、
+「B.条件」というニーモニックの一連の命令のうちの 2 つです。
+「B.条件」命令は、
+「条件」が成立する場合に、
+指定されたオフセットだけ相対ジャンプします。
+
+「B.条件」命令の「条件」には表 [[tab:arm/condition]] のような、
+*条件を表すニーモニック* (例: EQ、
+NE) を指定します。
+これらの「条件」は浮動小数点数演算の場合にも意味を持ちますが、
+ここでは整数演算における意味だけを記載しています。
+
+#+caption: Armv8-A の条件コード
+#+label: tab:arm/condition
+#+attr_latex: :environment maxtabular
+| コード | ニーモニック | 覚え方                | 意味 (整数)           | 条件フラグ          |
+|--------+--------------+-----------------------+-----------------------+---------------------|
+|   0000 | EQ           | Equal                 | 等しい                | Z == 1              |
+|   0001 | NE           | Not Equal             | 等しくない            | Z == 0              |
+|   0010 | CS、HS       | Carry Set             | キャリーあり          | C == 1              |
+|   0011 | CC、LO       | Carry Cleared         | キャリーなし          | C == 0              |
+|   0100 | MI           | MInus                 | 負である              | N == 1              |
+|   0101 | PL           | PLus                  | 正またはゼロである    | N == 0              |
+|   0110 | VS           | V Set                 | オーバーフローあり    | V == 1              |
+|   0111 | VC           | V Cleared             | オーバーフローなし    | V == 0              |
+|   1000 | HI           | HIgher                | より大きい (符号なし) | C == 1 && Z == 0    |
+|   1001 | LS           | Lower or Same         | 以下 (符号なし)       | !(C == 1 && Z == 0) |
+|   1010 | GE           | Greater than or Equal | 以上 (符号付き)       | N == V              |
+|   1011 | LT           | Less Than             | より小さい (符号付き) | N != V              |
+|   1100 | GT           | Greater Than          | より大きい (符号付き) | Z == 0 && N == V    |
+|   1101 | LE           | Less than or Equal    | 以下である (符号付き) | !(Z == 0 && N == V) |
+|   1110 | AL           | Always                | 常に成立              | 常に成立            |
+|   1111 | NV           | 不明 (Not Valid?)     | 常に成立              | 常に成立            |
+
+B 命令と同様に、
+B.EQ 命令や B.NE 命令も相対ジャンプ命令です。
+オペランドには、
+現在のプログラムカウンタの値から、
+ジャンプ先アドレスまでのオフセットを指定します。
+ただし、
+- Armv8-A アーキテクチャではすべての命令語長は 32 ビット
+- 「B.条件」命令では条件の指定に 5 ビット必要 (表 [[tab:arm/condition]])
+なので、
+相対ジャンプのオフセットに使用できるビット数が、
+B 命令よりも少なくなっています。
+B 命令では \pm 128 M バイト以内のオフセットを指定できましたが、
+「B.条件」命令では (5 ビット少なくって) \pm 1 M バイト以内のオフセットしか指定できません。
+
+B.EQ 命令と B.NE 命令の例を示します。
+#+begin_src asm-a64
+	b.eq     .L2	// PC ← <+> オフセット (自動計算される) if Z == 1
+	b.ne     .L4	// PC ← <+> オフセット (自動計算される) if Z == 0
+#+end_src
+
+#+begin_note
+なお、
+「B.条件」命令のニーモニック中のピリオド (~.~) を省略して
+#+begin_src asm-a64
+	beq     .L2	// PC ← <+> オフセット (自動計算される) if Z == 1
+	bne     .L4	// PC ← <+> オフセット (自動計算される) if Z == 0
+#+end_src
+のように記述することもできるようです。
+GAS のマニュアルや Armv8-A リファレンスマニュアル \cite{Arm:Armv8-A} の「C1.2 Structure of the A64 assembler language」にも記述は見当たりませんでしたが、
+GCC が生成するアセンブリ言語プログラムや文献 \cite{Arm:Armv8-A} 中のアセンブリ言語プログラムでも使用されています。
+#+end_note
+
+「B.条件」命令と同様に、
+CBZ (Compare and Branch on Zero) 命令と CBNZ (Compare and Branch on Nonzero) 命令も条件付き転送命令です。
+「B.条件」命令はフラグ N、
+Z、
+C、
+V の値に応じて相対ジャンプします。
+CBZ 命令および CBNZ 命令は、
+第 1 オペランドに指定したレジスタの値がゼロか非ゼロかに応じて相対ジャンプします。
+CBZ 命令および CBNZ 命令の例を示します。
+#+begin_src asm-a64
+	cbz     w0, .L2	// PC ← <+> オフセット (自動計算される) if W0 == 0
+	cbz     x0, .L4	// PC ← <+> オフセット (自動計算される) if X0 == 0
+#+end_src
+
+*** コール、リターン命令
+
+| ニーモニック       | 説明                                                 |
+|--------------------+------------------------------------------------------|
+| BL $c$             | \pc + $c$ 番地をサブルーチンコールする               |
+| (Branch with Link) | X30 ← \pc + 4, \pc ← <+> $c$                       |
+| RET [\r{i}]        | サブルーチンからリターンする                         |
+| (Return)           | \pc ← \r{i} (\r{i} の指定がなければ X30 を使用する) |
+
+BL (Branch with Link) 命令はサブルーチンをコールする命令です。
+IA-32 アーキテクチャや、
+COMET II、
+AVR アーキテクチャでは CALL 命令と呼ばれている命令に相当します。
+しかし、
+これらのアーキテクチャにおける CALL 命令とは動作が異なるため、
+Armv8-A アーキテクチャでは異なるニーモニックを割り当てているのだと考えられます。
+
+一般的な CALL 命令は
+1. リターンアドレスをスタックにプッシュする
+2. サブルーチンのアドレスにジャンプする
+のように動作します。
+Armv8-A アーキテクチャの BL 命令は、
+1. リンクレジスタ (レジスタ X30) にリターンアドレス (プログラムカウン
+   タの値 + 4) を保存する
+2. サブルーチンのアドレスに相対ジャンプする
+のように動作します。
+
+関数呼び出しには複数の実現法があり ([[sec:stack/funcall]] 節)、
+例えば IA-32 アーキテクチャや、
+COMET II、
+AVR アーキテクチャでは、
+関数呼び出しにスタックを使用します。
+これは、
+[[sec:stack/funcall]] 節で述べたように、
+LIFO (Last-In First-Out) という性質を持ったスタックは、
+入れ子になって実行される関数呼び出しの管理に都合が良いためです。
+
+しかし、
+Armv8-A アーキテクチャでは、
+以下のような理由により関数呼び出しにスタックを使用していないようです。
+- Armv8-A アーキテクチャは RISC であり、汎用レジスタが 31 個もある (レ
+  ジスタの数に余裕がある)
+- スタックはメモリ上に確保されるが、レジスタの読み書きと、メモリの読み
+  書きを比較すると、メモリの読み書きは圧倒的に低速である (コンピュータ
+  のアーキテクチャにもよるが、メモリの読み書きはレジスタの読み書きより
+  100 倍くらい遅い)。
+
+他の分岐命令と同様に、
+BL 命令も、
+現在のプログラムカウンタの値を基準として相対ジャンプ (より正確には相対コール) します。
+BL 命令のオペランドに指定できるオフセットの値の範囲は、
+B 命令と同じ \pm 128 M バイト以内です。
+B 命令も BL 命令もオペランドの数は 1 つだけなので、
+どちらの命令も 26 ビットのオフセット (即値) を格納できるからです。
+
+#+begin_note
+オフセットの値は 26 ビットの符号付き整数です。
+26 ビットの符号付き整数 $n$ の値の範囲は、
+\begin{align}
+  -2^{26-1} \le n \le 2^{26-1} - 1
+\end{align}
+です ([[sec:number/binary]] 節)。
+
+B 命令や BL 命令は、
+オフセットを 1/4 倍した値を即値に格納しているため、
+表現できるオフセット $\Delta$ の取りうる値の範囲は、
+\begin{align}
+  -2^{26-1} \times 4 \le \Delta \le (2^{26-1} - 1) \times 4
+\end{align}
+です。したがって、
+\begin{align}
+  -134 217 728 = -128 M \le \Delta \le 134217724 < 128M
+\end{align}
+であることがわかります。 
+#+end_note
+
+*** その他の命令
+
+表 [[tab:arm/top-18]] の 18 個の命令のうち、
+最後の命令は NOP です。
+
+NOP (No Operation) 命令は何も処理を行わない命令です。
+NOP 命令を実行すると、
+単にプログラムカウンタの値が (命令語長が 32 ビットであるため) 4 だけ増加します。
+
+IA-32 アーキテクチャや AVR アーキテクチャと同じように、
+Armv8-A アーキテクチャの NOP 命令もごく普通の NOP 命令です。
+一部、
+Armv8-A アーキテクチャの NOP 命令が、
+他のアーキテクチャの NOP 命令と異なると思えるのは、
+「NOP 命令の機械語が 0x1f、
+0x20、
+0x3d、
+0xd5 と複雑である」という点です。
+
+本書でこれまでに取り上げた命令セットアーキテクチャにおける NOP 命令の命令語を表 [[tab:arm/nop]] に示します。
+Armv8-A アーキテクチャ以外のアーキテクチャでは、
+NOP 命令の機械語は、
+短くて、
+なおかつビットパターンが単純なものが割り当てられています。
+つまり、
+ある意味では、
+Armv8-A アーキテクチャ以外のアーキテクチャでは、
+「NOP 命令は最も重要な命令の 1 つとして大切に扱われている」と言えます。
+特に重要な命令は、
+実行時間が短くなるように短い命令語が割り当てられ、
+なおかつ機械語のプログラムをダンプした時に認識できるように単純なビットパターンの命令語が割り当てられるからです。
+
+#+caption: 各アーキテクチャにおける NOP 命令の命令語
+#+label: tab:arm/nop
+| アーキテクチャ         | 命令語長            | 機械語                      |
+|------------------------+---------------------+-------------------------|
+| IA-32 アーキテクチャ   | 1 バイト            | 0x90                    |
+| COMET II               | 1 ワード (2 バイト) | 0x00** (* は何でもよい) |
+| AVR アーキテクチャ     | 2 バイト            | 0x00、0x00              |
+| Armv8-A アーキテクチャ | 4 バイト            | 0x1f、0x20、0x3d、0xd5  |
+
+そういう意味では、
+Armv8-A アーキテクチャの NOP 命令は、
+「NOP 命令はたいして重要な命令ではないので、
+空いているビットパターンを割り当てた」ように見えます (Armv8-A アーキテクチャの設計者が書いた文献等を読んだわけではなく、
+あくまで推測です)。
+
+** コードリーディング
+<<sec:arm/trace>>
+
+これまで、
+Armv8-A の 64 ビットモード命令セット (A64) における主要な 18 個の命令を説明しました。
+Armv8-A アーキテクチャのアセンブリ言語プログラミングにおいて特に重要な知識は吸収できたと思います。
+
+それでは、
+さっそくいくつかのプログラムを読んでみましょう。
+
+*** 静的変数どうしの加算
+
+まずは単純な加算のプログラム ~add-static.c~ です (図 [[fig:arm/add-static.ss]])。
+[[sec:arm/overview]] 節で動作をトレースしたプログラム ~add.c~ (図 [[fig:arm/add.c]]) とほとんど同じですが、
+変数 ~i~ および ~j~ を自動変数ではなく、
+大域変数として宣言しています。
+int 型の変数 ~i~ と ~j~ を使って、
+単純な加算を行っているだけのプログラムです。
+また、
+大域変数の宣言時に ~volatile~ キーワードを付けて、
+変数 ~i~ および ~j~ に対する GCC の最適化を抑止しています ([[sec:asm/lang-to-asm]] 節)。
+
+#+caption: arm/add-static.c
+#+label: fig:arm/add-static.c
+#+include: "code/arm/add-static.c" src C
+
+以下のように C 言語で書かれたプログラムをコンパイルし、
+アセンブリ言語のプログラムを生成します ([[sec:asm/asm-to-machine]] 節)。
+#+begin_src sh
+$ aarch64-linux-gnu-gcc-10 -fno-pic -fomit-frame-pointer -Og -S add-static.c
+#+end_src
+
+#+begin_note
+GCC のコンパイル時オプションや最適化オプションの設定によっては、
+元の C 言語のプログラムと、
+コンパイルされたアセンブリ言語プログラムを並べて読んでも、
+何がどう対応しているかほとんどわからなくなることがあります。
+
+本書では、
+コンパイル時オプションの組み合わせをいろいろ試した中で、
+「素朴で、
+読みやすいアセンブリ言語プログラム」が生成されたオプションの組み合わせでコンパイルしたアセンブリ言語プログラムを掲載しています。
+#+end_note
+
+以下のようなアセンブリ言語プログラムが得られました (図 [[fig:arm/add-static.s]])。
+
+#+caption: arm/add-static.s
+#+label: fig:arm/add-static.s
+#+include: "code/arm/add-static.s" src asm-a64
+
+[[sec:tr-regs/asm-matching]] 節と同じように、
+特に重要なものを除いてアセンブラの疑似命令を削除します (図 [[fig:arm/add-static.ss]])。
+
+# -Og
+#+caption: arm/add-static.ss
+#+label: fig:arm/add-static.ss
+#+include: "code/arm/add-static.ss" src asm-a64
+
+上のプログラムでは、
+アセンブリ言語プログラムの各行のコメントに、
+#+begin_src asm-a64
+        mov     w2, 123                         // W2 ← 123
+#+end_src
+のように、
+それぞれの命令の動作を CPU の抽象モデルで記述しています。
+また、
+#+begin_src asm-a64
+        // j = 456
+        mov     w2, 456                         // W2 ← 456
+        str     w2, [x1, 4]                     // [j] ← W2
+#+end_src
+のように、
+C 言語で書かれたプログラムのどの部分がアセンブリ言語のプログラムに対応しているかをコメントの形で記載しています。
+これに加えて、
+#+begin_src asm-a64
+// int main(void)
+//   返り値: W0
+main:
+#+end_src
+のように、
+関数の引数および返り値の (C 言語における) 型と、
+それらの値がどのレジスタに対応しているかをコメントの形で追記しています。
+
+C 言語で書かれたプログラム ~add-static.c~ (図 [[fig:arm/add-static.c]]) と、
+それをコンパイルして生成されたアセンブリ言語プログラムを抜粋したもの ~add-static.ss~ (図 [[fig:arm/add-static.ss]]) をじっくり比較してみてください。
+
+Armv8-A アーキテクチャも、
+普通のフォン・ノイマン型コンピュータです。
+~add-static.ss~ (図 [[fig:arm/add-static.ss]]) のコメントに記した、
+CPU の抽象モデルでプログラムの処理を追いかければ、
+それほど苦労なく理解できるでしょう。
+
+これまでに学んだ知識で読み解けると思いますが、
+いくつか理解する上で役立ちそうな点について補足しておきます。
+
+**** 関数の返り値に使われるレジスタについて
+
+#+begin_src asm-a64
+// int main(void)
+//   返り値: W0
+main:
+#+end_src
+というコメントに示すように、
+関数 ~main~ の返り値はレジスタ W0 で返されます。
+Armv8-A アーキテクチャの ABI (Application Binary Interface) は、
+PCS (Procedure Call Standard; 手続き呼び出し標準) \cite{Arm:PCS} で定められています ([[sec:stack/abi]] 節)。
+Armv8-A の PCS では、
+関数が 32 ビットの整数を 1 つだけ返す場合は、
+レジスタ W0 を使用することが定められています。
+関数 ~main~ も PCS に従い、
+レジスタ W0 で値を返しています。
+
+**** ラベル ~.LANCHOR0~ について
+
+#+begin_src asm-a64
+	// i = 123
+	adrp	x0, .LANCHOR0			// X0 ← i & 0xfffffffffffff000 ページアドレス
+	add	x1, x0, :lo12:.LANCHOR0		// X1 ← X0 + (i & 0xfff)
+	:
+	:
+	.set	.LANCHOR0,. + 0
+i:
+	.zero	4
+
+#+end_src
+等で登場しているラベル ~.LANCHOR0~ についてです。
+ラベル名が ~.LANCHOR0~ なので、
+始めてこのラベルを見ると、
+「ランチョーゼロって何のことだろう?」
+と疑問に思うかもしれません。
+
+これはどうやら、
+「.L (ドットエル) anchor (アンカー) 0」という意味のようです。
+~.L~ から始まるラベルなので、
+これは局所シンボルです ([[sec:tr-regs/asm-matching]] 節)。
+「ラベル ~.LANCHOR0~ のあるメモリアドレスが、
+基準となるメモリアドレスだよ」ということを意味しています。
+
+[[sec:arm/trans]] 節で述べたように、
+Armv8-A アーキテクチャでは、
+メモリの絶対アドレスを命令の即値に格納するのが容易ではないため、
+現在のプログラムカウンタからのオフセットを即値に記録します。
+
+GCC は、
+現在のプログラムカウンタからのオフセットを指定する時に、
+基準となるアドレスにアンカー (anchor; 固定するもの) として局所シンボル ~.LANCHOR0~ を生成するようです。
+
+**** 無駄の多い命令について
+
+プログラム ~add-static.ss~ (図 [[fig:arm/add-static.ss]]) をじっくり読むと、
+かなり無駄の多いプログラムであることがわかります。
+例えば、
+#+begin_src asm-a64
+	mov	w2, 123				// W2 ← 123
+	str	w2, [x0, #:lo12:.LANCHOR0]	// [i] ← W2 ← なくても動作する
+	ldr	w2, [x0, #:lo12:.LANCHOR0]	// W2 ← [i] ← なくても動作する
+#+end_src
+とか
+#+begin_src asm-a64
+	// j = 456
+	mov	w2, 456				// W2 ← 456
+	str	w2, [x1, 4]			// [j] ← W2 ← なくても動作する
+	// j = i + j
+	ldr	w0, [x0, #:lo12:.LANCHOR0]	// W0 ← [i]
+	ldr	w2, [x1, 4]			// W2 ← [j] ← なくても動作する
+#+end_src
+のように、
+レジスタの値をメモリに書き込んで、
+再度その値を読み出しています。
+「無駄の多いプログラムだな……」という印象を持つかもしれませんが、
+これは、
+プログラム ~add-static.c~ (図 [[fig:arm/add-static.c]]) において、
+#+begin_src C
+volatile int i, j;
+#+end_src
+のように変数宣言に volatile キーワードを付けたためです。
+GCC によるコンパイル時の最適化を抑止するために付けたのですが、
+これによって無駄の多いプログラムに変換されてしまっています。
+
+#+begin_note
+volatile キーワードは、
+#+begin_quote
+このキーワードを付けた変数は、
+C コンパイラの知らないところで勝手に (例えばオペレーティングシステムや外部のハードウェア等によって) 読み書きされるかもしれないから、
+そのつもりでコンパイルしてね。
+#+end_quote
+ということをコンパイラに伝えています。
+
+したがって、
+GCC は、
+変数 ~i~ や ~j~ の値はいつ読み書きされるかわからないため、
+おっかなびっくりで、
+何度も何度も読み書きを繰り返すような慎重なコードを生成しています。
+#+end_note
+
+**** CPU 処理の抽象モデルではない記述について
+
+CPU 処理の抽象モデルによる記述のままでは分かりづらいと思える箇所には、
+「その命令は結局何をしたいのか」ということをコメントに記載しています。
+例えば、
+#+begin_src asm-a64
+	ldr	w2, [x0, #:lo12:.LANCHOR0]	// W2 ← [i]
+#+end_src
+という LDR 命令の処理を CPU の抽象モデルで記述すると、
+#+begin_quote
+W2 ← [X0 + (~.LANCHOR0~ & 0xfff)]
+#+end_quote
+となります。
+しかし、
+このプログラムの意図は「メモリの ~i~ 番地に格納されている値をレジスタ W2 に読み込むこと」なので、
+コメントにはそのことがわかる形で記載しています。
+
+*** 条件分岐
+
+他のプログラムも読んでみましょう。
+
+次は条件分岐のプログラムです。
+これ以降は、
+C 言語で書かれたプログラムと、
+それを GCC によってコンパイルすることで得られたアセンブリ言語プログラム (を抜粋し、
+コメントを付与したもの) のみを掲載します。
+
+if 文を使った単純なプログラム ~branch.c~ です (図 [[fig:arm/branch.c]])。
+IA-32 アーキテクチャの説明に使用したプログラム (図 [[fig:x86ctrl/branch.c]] 同じものです。
+
+#+caption: arm/branch.c
+#+label: fig:arm/branch.c
+#+include: "code/arm/branch.c" src C
+
+このプログラムは、
+~-S~ オプションの他に図 [[fig:arm/O2-option]] のようなコンパイル時オプションを使用しました。
+これも、
+単純で、
+読みやすく、
+キレイなアセンブリ言語プログラムを生成させるためです。
+
+#+caption: GCC のコンパイル時オプション (~-S~ オプションを除く)
+#+label: fig:arm/O2-option
+#+begin_src raw
+-fno-pic -fomit-frame-pointer -O2 -fno-optimize-sibling-calls -fno-inline-functions -fno-inline-small-functions -fno-indirect-inl ining -fno-schedule-insns -fno-schedule-insns2
+#+end_src
+
+生成されたアセンブリ言語プログラムを抜粋して、
+コメントを付与したものが ~branch.ss~ (図 [[fig:arm/branch.ss]]) です。
+
+# -O2 -fno-optimize-sibling-calls -fno-inline-functions -fno-inline-small-functions -fno-indirect-inl ining -fno-schedule-insns -fno-schedule-insns2
+#+caption: arm/branch.ss
+#+label: fig:arm/branch.ss
+#+include: "code/arm/branch.ss" src asm-a64
+
+CSINC 命令が登場していること以外は、
+すべてこれまでに見慣れた命令ばかりなので、
+ほとんどの箇所は苦労なく読めるのではないでしょうか。
+
+ただ、
+最適化オプションを有効にしたこともあり、
+興味深いアセンブリ言語プログラムに変換されています。
+例えばプログラム ~branch.c~ は
+#+begin_src C
+	if (i == 123)
+		j = j + 1;
+	else
+		j = j - 1;
+#+end_src
+というロジックでしたが、
+生成されたアセンブリ言語プログラムでは
+1. まず、~j~ を -1 する。
+2. もし ~i~ が 123 なら、~j + 1~ を使うが、そうでなければ (-1 しておい
+   た) ~j~ を使う。
+というロジックになっています。
+
+GCC の最適化アルゴリズムの詳細を確認したわけではありませんが、
+- ~i == 123~ という等号が成立する確率は小さいはず。
+- おそらく ~i == 123~ は成立しないだろうから、先に ~j = j - 1~ を計算
+  しておこう。
+- もし万が一、~i == 123~ が成立することがあれば、その時に ~j = j + 1~
+  を計算すればいいだろう。
+という考えで最適化しているのだろうと考えられます。
+
+CSINC 命令は、
+条件判定と +1 の加算を 1 命令で行うという珍しい命令です。
+#+begin_src asm-a64
+	csinc	w0, w2, w0, ne			// ZF == 0 ? W2 : (W0 + 1)
+#+end_src
+「CSINC 宛先レジスタ, 出所レジスタ 1, 出所レジスタ 2, 条件」という形式のオペランドを取ります。
+もし「条件」が成立すれば、
+「出所レジスタ 1」の値を「宛先レジスタ」に格納します。
+「条件」が成立しなければ、
+「出所レジスタ 2」に 1 を加算した値を「宛先レジスタ」に格納します。
+
+上の例では、
+条件が NE なので、
+等しくない (直前の演算でゼロフラグがクリアされている) なら、
+レジスタ W2 の値をレジスタ W0 に格納します。
+そうでなければ (等しいなら)、
+レジスタ W0 の値に +1 した値をレジスタ W0 に格納します。
+
+*** while 文による単純な繰り返し
+
+次のプログラムを見てみましょう。
+while 文を使用した単純な一重ループのプログラム ~while.c~ です (図 [[fig:arm/while.c]])。
+[[sec:x86ctrl/reading]] 節で登場したプログラム (図 [[fig:x86ctrl/while.c]]) と同じものです。
+
+#+caption: arm/while.c
+#+label: fig:arm/while.c
+#+include: "code/arm/while.c" src C
+
+このプログラムには、
+プログラム ~add-static.c~ (図 [[fig:arm/add-static.c]]) の時と同じように
+#+begin_src raw
+-fno-pic -fomit-frame-pointer -Og
+#+end_src
+というコンパイル時オプションを使用しました。
+以下、
+特に断りがない場合は、
+上記のコンパイル時オプションを使用してコンパイルしています。
+
+生成されたアセンブリ言語プログラム (を抜粋し、
+コメントを付与したもの) が ~while.ss~ (図 [[fig:arm/while.ss]]) です。
+
+# -O
+#+caption: arm/while.ss
+#+label: fig:arm/while.ss
+#+include: "code/arm/while.ss" src asm-a64
+
+非常に素直なアセンブリ言語プログラムなので、
+C 言語のプログラムと比較すれば読み解けると思います。
+
+*** 単一ループによる順列の和の計算
+
+次は、
+for 文を利用した単純なループのプログラムです。
+1〜100 までの整数の和を計算するプログラム ~sum.c~ です (図 [[fig:arm/sum.c]])。
+このプログラムも、
+IA-32 アーキテクチャの説明の時に用いたプログラム (図 [[fig:x86ctrl/for.c]]) と同じものです。
+
+#+caption: arm/sum.c
+#+label: fig:arm/sum.c
+#+include: "code/arm/sum.c" src C
+
+アセンブリ言語プログラムを示します (図 [[fig:arm/sum.ss]])。
+
+# -Og
+#+caption: arm/sum.ss
+#+label: fig:arm/sum.ss
+#+include: "code/arm/sum.ss" src asm-a64
+
+これも特に難しいところもないプログラムなので、
+ここまでの説明を理解できていれば楽に読み解けるでしょう。
+
+*** 階乗の計算
+
+さて、
+もう少し複雑なプログラムを読んでみましょう。
+階乗を計算するプログラム ~fact.c~ です (図 [[fig:arm/fact.c]])。
+これも、
+IA-32 アーキテクチャの説明の時に用いたプログラム (図 [[fig:x86ctrl/fact.c]]) と同じものです。
+
+#+caption: arm/fact.c
+#+label: fig:arm/fact.c
+#+include: "code/arm/fact.c" src C
+
+このプログラムには、
+図 [[fig:arm/O2-option]] のコンパイル時オプションを使用しました。
+生成されたアセンブリ言語プログラムは図 [[fig:arm/fact.ss]] です。
+アセンブリ言語のプログラム自体は短いものであり、
+プログラム中のコメントを読めば理解できると思います。
+
+# -O2 -fno-optimize-sibling-calls -fno-inline-functions -fno-inline-small-functions -fno-indirect-inlining -fno-schedule-insns -fno-schedule-insns2
+#+caption: arm/fact.ss
+#+label: fig:arm/fact.ss
+#+include: "code/arm/fact.ss" src asm-a64
+
+ただし、
+Armv8-A アーキテクチャにおいて、
+関数呼び出しを行うアセンブリ言語プログラムを読むのは初めてなので、
+少し補足しておきましょう。
+
+**** レジスタの退避と復帰について
+
+[[sec:arm/trans]] 節で述べたように、
+Armv8-A アーキテクチャには、
+スタックを操作する PUSH 命令や POP 命令がありません。
+スタックの操作には、
+通常の LDR/STR 命令や LDP/STP 命令を使用します。
+これらの命令のオペランドにプリ・インデックスやポスト・インデックスを使用して、
+スタックの操作を実現します。
+
+関数 ~fact~ の冒頭でレジスタをスタックに退避し、
+また、
+関数 ~fact~ の末尾でスタックに格納したレジスタを復帰しています。
+これらの処理に該当するのが以下の箇所です。
+#+begin_src asm-a64
+fact:
+	stp	x19, x30, [sp, -16]!	// push X30; push X19
+	:
+	:
+	ldp	x19, x30, [sp], 16	// pop X19; pop X30
+	ret				// PC ← X30
+#+end_src
+64 ビットのレジスタの大きさは 8 バイトであり、
+STP/LDP 命令を使用して 2 つのレジスタの値をまとめて読み書きしているため、
+オフセットには -16 や 16 を指定しています。
+
+**** 関数への引数の渡し方について
+
+アセンブリ言語プログラムのコメント中に
+#+begin_src asm-a64
+// int fact(int n)
+//   n: W0, 返り値: w0
+fact:
+#+end_src
+と記載しているように、
+関数 ~fact~ の引数 ~n~ (int 型) はレジスタ W0 で受け取ります。
+関数 ~main~ と同じように、
+関数 ~fact~ も返り値はレジスタ W0 で返します。
+
+IA-32 アーキテクチャ向け UNIX の ABI では、
+関数への引数はスタックに積んで渡すという決まりになっていました ([[sec:stack/funcall]] 節)。
+一方、
+Armv8-A アーキテクチャの PCS では、
+関数への引数はレジスタ経由で渡すという決まりになっています。
+PCS の詳細については文献 \cite{Arm:PCS} を参照してください。
+
+*** 再帰呼び出しのサンプル (フィボナッチ数)
+
+階乗の計算と同じようなプログラムですが、
+もう 1 つ関数呼び出しを使った再帰のプログラムを見てみましょう。
+フィボナッチ数を求めるプログラム ~fib.c~ です (図 [[fig:arm/fib.c]])。
+これも、
+これまでに紹介したプログラム ([[sec:gas/directive]] 節) と同じものです。
+
+#+caption: arm/fib.c
+#+label: fig:arm/fib.c
+#+include: "code/arm/fib.c" src C
+
+対応するアセンブリ言語プログラム ~fib.ss~ を以下に示します (図 [[fig:arm/fib.ss]])。
+
+# -Og
+#+caption: arm/fib.ss
+#+label: fig:arm/fib.ss
+#+include: "code/arm/fib.ss" src asm-a64
+
+新しく CBZ 命令 ([[sec:arm/ctrl]] 節) が使われている程度で、
+それ以外は、
+これまで見たアセンブリ言語プログラムと同じような構成になっています。
+
+*** 二重ループのサンプル (挿入ソート)
+
+次のプログラムは挿入ソートです。
+プログラム ~isort.c~ を図 [[fig:arm/isort.c]] に示します。
+COMET II の説明で使用したプログラム (図 [[fig:comet/c/isort.c]]) と同じものです。
+
+これまでに見てきた C 言語のプログラムとの違いは、
+while 文による 2 重ループになっていることと、
+配列変数を使っているという点です。
+特に、
+C 言語における配列へのアクセスが、
+Armv8-A アーキテクチャのアセンブリ言語プログラムにおいてどのような命令にコンパイルされるかに注目して見てみましょう。
+
+#+caption: arm/isort.c
+#+label: fig:arm/isort.c
+#+include: "code/arm/isort.c" src C
+
+GCC が生成したアセンブリ言語プログラムを抜粋し、
+コメントを付与したものを以下に示します (図 [[fig:arm/isort.ss]])。
+
+# -Og
+#+caption: arm/isort.ss
+#+label: fig:arm/isort.ss
+#+include: "code/arm/isort.ss" src asm-a64
+
+プログラム ~isort.c~ において int 型の配列 ~a~ にアクセスしている箇所は、
+例えば以下のようなアセンブリ言語プログラムに変換されています。
+#+begin_src asm-a64
+	// a[j - 1] > a[j]
+	sub	w2, w0, #1		// W2 ← W0 - 1
+	adrp	x1, .LANCHOR0		// X1 ← a & 0xfffffffffffff000 ページアドレス
+	add	x1, x1, :lo12:.LANCHOR0	// X1 ← <+> a & 0xfff
+	ldr	w4, [x1, w2, sxtw 2]	// W4 ← [X1 + W2 << 2]
+	ldr	w3, [x1, w0, sxtw 2]	// W3 ← [X1 + W0 << 2]
+#+end_src
+ベースレジスタとオフセットを用いたアドレス指定モード ([[sec:arm/inst]] 節) によって、
+配列変数の各要素を読み出していることがわかります。
+
+上の例では、
+レジスタ X1 をベースレジスタとし、
+レジスタ W2 およびレジスタ W0 によってオフセットを指定しています。
+例えば、
+#+begin_src asm-a64
+	ldr	w4, [x1, w2, sxtw 2]	// W4 ← [X1 + W2 << 2]
+#+end_src
+では、
+配列 ~a~ を格納しているデータ領域の先頭のアドレスがレジスタ X1 に格納されています (直前の ADRP 命令および ADD 命令によってメモリアドレスを取得しています)。
+
+レジスタ W0 には、
+C 言語のプログラムにおける ~j-1~ の値が格納されています。
+ベースレジスタをレジスタ X1、
+オフセットをレジスタ W2 によって指定し、
+メモリアドレス ~a~ から始まるデータの、
+~j-1~ 番目の値をレジスタ W4 に読み出しています。
+
+ただし、
+Armv8-A の 64 ビットモードでは、
+アドレスは 64 ビットです。
+オフセットに使用しているレジスタ W2 の大きさは 32 ビットなので、
+sxtw によって、
+「レジスタ W2 を符号付き整数としてダブルワード (64 ビット) に拡張する (符号拡張する)」ことを指定しています (表 [[tab:arm/modifier]])。
+
+また、
+配列 ~a~ は ~int~ 型の配列であり、
+Armv8-A の 64 ビットモードにおける ~int~ の大きさは 32 ビットです。
+したがって、
+配列 ~a~ の ~j-1~ 番目の値である ~a[j-1]~ は、
+「~a~ のアドレス + (~j~ - 1) \times 4」に格納されています。
+このため、
+「sxtw 2」によってレジスタ W0 の値を左に 2 ビットシフトする (つまり 4 倍する) ことを指定しています。
+
+アセンブリ言語プログラム ~isort.ss~ には、
+B 命令だけでなく、
+B.LE 命令および B.GT 命令が使われています。
+これらの条件コードの意味については表 [[tab:arm/condition]] を参照してください。
+
+*** 再帰呼び出しのサンプル (ハノイの塔)
+
+最後に、
+もう少し複雑なプログラムを見てみましょう。
+ハノイの塔を解くプログラム ~hanoi.c~ です。
+これも COMET II の説明で使用したプログラム (図 [[fig:comet/c/hanoi.c]]) とほぼ同じです。
+ただし、
+Armv8-A では char 型を利用するとかってアセンブリ言語プログラムが複雑になるため、
+char 型を使用せずにすべて int 型を使用するように変更しています。
+
+#+caption: arm/hanoi.c
+#+label: fig:arm/hanoi.c
+#+include: "code/arm/hanoi.c" src C
+
+これまでのプログラムとは異なり、
+関数 ~hanoi~ は複数の引数を取ります。
+また、
+C 言語の標準ライブラリ中の関数 ~printf~ を呼び出しています。
+特にこのあたりに注目して、
+対応するアセンブリ言語プログラム (図 [[fig:arm/hanoi.ss]]) を見てみましょう。
+
+# -Og
+#+caption: arm/hanoi.ss
+#+label: fig:arm/hanoi.ss
+#+include: "code/arm/hanoi.ss" src asm-a64
+
+以下のようにコメントに記したように、
+関数 ~hanoi~ は 4 つの引数をレジスタ W0〜W3 から受け取ります。
+#+begin_src asm-a64
+// void hanoi(int n, int from, int to, int aux)
+//   n: W0, from: W1, to: W2, aux: W3, 返り値: なし
+hanoi:
+#+end_src
+前述のように、
+関数に対する引数の渡し方や、
+関数からの返り値の返し型は PCS \cite{Arm:PCS} で定められており、
+特に引数や返り値が整数の場合は、
+以下のように定められています。
+
+- 引数が 8 個以下であれば、引数はレジスタ X0〜X7 または W0〜W7 を使っ
+  て関数に渡す。引数が 8 個を超える場合は、9 番目以降の引数はスタック
+  に積んで関数に渡す
+- 返り値が 8 個以下であれば、返り値はレジスタ X0〜X7 または W0〜W7を使っ
+  て呼び出し元に返す。返り値が 8 個を超える場合は、9 番目以降の返り値
+  はスタックに積んで呼び出し元に返す
+- ただし、引数や返り値が 64 ビットの整数の場合はレジスタ X0〜X7 を使い、
+  引数や返り値が 32 ビットの整数の場合はレジスタ W0〜W7 を使う
+
+また、
+関数 ~printf~ を呼び出しているのは、
+例えば
+#+begin_src asm-a64
+	// printf ("%d -> %d\n", from, to)
+	mov	w2, w20			// W2 ← W20
+	mov	w1, w21			// W1 ← W21
+	adrp	x0, .LC0		// X0 ← .LC0 & 0xfffffffffffff000  ページアドレス
+	add	x0, x0, :lo12:.LC0	// X0 ← <+> .LC0 & 0xfff
+	bl	printf			// X30 ← PC + 4; PC ← printf
+#+end_src
+という箇所です。
+関数 ~printf~ への引数は以下のように渡していることがわかります。
+
+- 第 1 引数は、文字列 ~%d -> %d\n~ が格納されているメモリへのアドレス。
+  メモリアドレスは 64 ビットであるため、レジスタ X0 にアドレス (ラベ
+  ル ~.LC0~ の値) を格納している
+- 第 2 引数は変数 ~from~ の値。関数 ~printf~ の書式指定子 ~%d~ に対応
+  する値であるため、int 型の符号付き整数。したがって、レジスタ W1 に値
+  を格納している
+- 第 3 引数は変数 ~to~ の値。第 2 引数と同じように、これも関数
+  ~printf~の書式指定子 ~%d~ に対応する値であり、int 型の符号付き整数。
+  レジスタW2 に値を格納している
+
+** 章末問題
+<<sec:arm/quiz>>
+
+1. Armv8-A のアーキテクチャリファレンスマニュアル \cite{Arm:Armv8-A}
+   を入手せよ。
+
+2. 1. で入手したアーキテクチャリファレンスマニュアルにおいて、キャリー
+   フラグ (CF) の役割が説明されている箇所を特定して読んでみよ。
+
+   #+begin_answer
+   文献 \cite{Arm:Armv8-A} の「B1.2.2 Process state, PSTATE」に説明がある。
+   #+end_answer
+
+3. レジスタ X0 の値を、レジスタ X1 と X2 の両方にコピーするアセンブリ
+   言語プログラムを示せ。
+
+   #+begin_answer
+   MOV 命令を使用すれば、
+   レジスタ間でデータをコピーできる。
+
+   プログラムの例: ~copy.s~ (図 [[fig:arm/ex/copy.s]])
+   #+caption: arm/ex/copy.s
+   #+label: fig:arm/ex/copy.s
+   #+include: "code/arm/ex/copy.s" src asm-a64
+
+   上記のプログラムでは、
+   まず、
+   64 ビットの値 (0x1234 5678 9abc def0) をレジスタ X0 に読み込み、
+   その値をレジスタ X1 および X2 にコピーしている。
+
+   なお、末尾の
+#+begin_src asm-a64
+	mov	x8, 93		// 93 番は exit
+	svc	0		// システムコール呼び出し
+#+end_src
+   は Linux カーネルの exit システムコール (93 番) を呼び出すことでプロセスを終了している。
+   終了ステータスはレジスタ X0 の値となる (本プログラムでは設定していない)。
+   #+end_answer
+
+3. レジスタ X0 の値の下位 32 ビットを、レジスタ X1 の下位 32 ビットに
+   コピーするアセンブリ言語プログラムを示せ。ただし、レジスタ X1 の上
+   位 32 ビットは変化させないこと。
+
+   #+begin_answer
+   COMET II ([[sec:comet/quiz]] 節) や AVR アーキテクチャ ([[sec:avr/quiz]] 節) の場合と同じように、
+   論理和と論理積を用いればよい。
+
+   プログラムの例: ~copy-low.s~ (図 [[fig:arm/ex/copy-low.s]])
+   #+caption: arm/ex/copy-low.s
+   #+label: fig:arm/ex/copy-low.s
+   #+include: "code/arm/ex/copy-low.s" src asm-a64
+   #+end_answer
+
+4. レジスタ X0 の値の下位 32 ビットを、レジスタ X1 の下位 32 ビットに
+   コピーするアセンブリ言語プログラムを示せ。ただし、レジスタ X1 の上
+   位 32 ビットはゼロでクリアすること。
+
+   #+begin_answer
+   レジスタ X1 の下位 32 ビットを書き換え、
+   上位 32 ビットをクリアするのであれば、
+   汎用レジスタ W1 に下位 32 ビットの値を書き込めばよい。
+   レジスタ W1 を書き換えると、
+   レジスタ X1 の上位 32 ビットが自動的にゼロでクリアされる。
+
+   プログラムの例: ~copy-low-clear.s~ (図 [[fig:arm/ex/copy-low-clear.s]])
+   #+caption: arm/ex/copy-low-clear.s
+   #+label: fig:arm/ex/copy-low-clear.s
+   #+include: "code/arm/ex/copy-low-clear.s" src asm-a64
+   #+end_answer
+
+5. レジスタ X0 と X1 の値を交換するアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   IA-32 アーキテクチャには、
+   レジスタの値を交換する XCHG 命令がある ([[sec:x86trans/transfer]] 節) が、
+   Armv8-A アーキテクチャにはそのような命令は存在しない。
+   レジスタ X0 と X1 以外に、
+   もう 1 つ別のレジスタを使用してレジスタの値を交換する。
+
+   プログラムの例: ~swap.s~ (図 [[fig:arm/ex/swap.s]])
+   #+caption: arm/ex/swap.s
+   #+label: fig:arm/ex/swap.s
+   #+include: "code/arm/ex/swap.s" src asm-a64
+   #+end_answer
+
+6. 123 + 456 を計算するアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   他のアーキテクチャと同じように、
+   MOV 命令と ADD 命令の組み合せで記述できる。
+   取り扱う値がそれほど大きくなければ、
+   それらの値を MOV 命令や ADD 命令の即値に記述できる。
+   Armv8-A アーキテクチャの ADD 命令はオペランドを 3 つ取ることに注意する。
+
+   プログラムの例: ~add.s~ (図 [[fig:arm/ex/add.s]])
+   #+caption: arm/ex/add.s
+   #+label: fig:arm/ex/add.s
+   #+include: "code/arm/ex/add.s" src asm-a64
+   #+end_answer
+
+7. (123 + 456) / 78 を計算するアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   符号なし整数の除算には UDIV 命令を、
+   符号付き整数の除算には SDIV 命令が使用できる。
+   ADD 命令と同じように、
+   UDIV/SDIV 命令もオペランドを 3 つ取ることに注意する。
+
+   プログラムの例: ~add-div.s~ (図 [[fig:arm/ex/add-div.s]])
+   #+caption: arm/ex/add-div.s
+   #+label: fig:arm/ex/add-div.s
+   #+include: "code/arm/ex/add-div.s" src asm-a64
+   #+end_answer
+
+8. 789 / (123 + 456) を計算するアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   7.のプログラムとほとんと同じように書ける。
+
+   プログラムの例: ~div-add.s~ (図 [[fig:arm/ex/div-add.s]])
+   #+caption: arm/ex/div-add.s
+   #+label: fig:arm/ex/div-add.s
+   #+include: "code/arm/ex/div-add.s" src asm-a64
+   #+end_answer
+
+9. (12 + 34) / (5 - 6) \times (7 - 89) を計算するアセンブリ言語プログ
+   ラムを示せ。
+
+   #+begin_answer
+   乗算には MUL 命令が使用できる。
+   やはりこれもオペランドを 3 つ取ることに注意する。
+
+   プログラムの例: ~add-mul.s~ (図 [[fig:arm/ex/add-mul.s]])
+   #+caption: arm/ex/add-mul.s
+   #+label: fig:arm/ex/add-mul.s
+   #+include: "code/arm/ex/add-mul.s" src asm-a64
+   #+end_answer
+
+10. レジスタ X0 の値を 4 倍にするアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   他のアーキテクチャの場合 ([[sec:x86arith/quiz]] 節、
+   [[sec:comet/quiz]] 節、
+   [[sec:avr/quiz]] 節) と同じように、
+   レジスタの値を左方向に 2 ビットシフトすればよい。
+   左方向のビットシフトには LSL 命令が使用できる。
+   ビットシフトの回数は、
+   第 3 オペランドに即値として記述できる。
+
+   プログラムの例: ~quad.s~ (図 [[fig:arm/ex/quad.s]])
+   #+caption: arm/ex/quad.s
+   #+label: fig:arm/ex/quad.s
+   #+include: "code/arm/ex/quad.s" src asm-a64
+   #+end_answer
+
+11. レジスタ X0 の値 (符号なし整数) が 123 以上であればレジスタ X1 を1
+    にし、そうでなければ 0 にするアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   何通りもの書き方があるが、
+   ここでは CSET 命令を使用したプログラムの例を示す。
+
+   CSET 命令は「レジスタ, 条件」というオペランドを取り、
+   「条件」が成立していれば「レジスタ」の値を 1 にし、
+   そうでなければ「レジスタ」の値を 0 にする。
+
+   プログラムの例: ~cmp.s~ (図 [[fig:arm/ex/cmp.s]])
+   #+caption: arm/ex/cmp.s
+   #+label: fig:arm/ex/cmp.s
+   #+include: "code/arm/ex/cmp.s" src asm-a64
+
+   まず、
+   CMP 命令によって、
+   レジスタ X0 の値と即値 123 を比較する。
+   これによって、
+   PSTATE のフラグが設定される。
+   
+   条件「PL (Plus)」は、
+   直前の演算結果が「正または 0」であるか (つまり、
+   N (Negative) フラグが 0 か) を意味する条件コードである (表 [[tab:arm/condition]])。
+   レジスタ X0 の値が 123 以上である場合、
+   レジスタ X1 の値が 1 となる。
+   レジスタ X0 の値が 123 未満であれば、
+   レジスタ X1 の値が 0 となる。
+
+   もちろん、他のアーキテクチャと同じように、
+   比較命令 (CMP) と条件分岐命令 (BR.条件)、
+   データ転送命令 (MOV) を組み合わせて記述することもできる。
+   #+end_answer
+
+12. レジスタ X0 の値が奇数であればレジスタ X1 を 1 にし、そうでなけれ
+    ば 0 にするアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   レジスタ X0 の最下位ビット (LSB) が値の奇数・偶数を表しているため、
+   最下位ビットをチェックすればよい。
+
+   これもいくつかの方法があるが、
+   ここでは TST 命令を使用したプログラムの例を示す。
+
+   TST 命令は、
+   「レジスタ, 即値」または「レジスタ, レジスタ」というオペランドを取り、
+   2 つのオペランドの論理積によって PSTATE のフラグを設定する。
+   CMP 命令は 2 つの値の「差」に応じてフラグレジスタを設定するが、
+   TST 命令は 2 つの値の「論理積」に応じてフラグレジスタを設定する。
+
+   プログラムの例: ~odd.s~ (図 [[fig:arm/ex/odd.s]])
+   #+caption: arm/ex/odd.s
+   #+label: fig:arm/ex/odd.s
+   #+include: "code/arm/ex/odd.s" src asm-a64
+
+   ここではレジスタ X0 と 1 の論理積を計算している。
+   レジスタ X0 の値が偶数であれば Z フラグが 1 となり、
+   レジスタ X1 の値が奇数であれば Z フラグが 0 となる。
+
+   条件「NE (Not Equal)」は、
+   直前の演算結果が「等しくない」こと (つまり、
+   Z フラグが 0 であるか) を意味する条件コードである (表 [[tab:arm/condition]])。
+   #+end_answer
+
+13. スタックポインタ (レジスタ SP) の値をレジスタ X0 にコピーするアセ
+    ンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   Armv8-A アーキテクチャにおけるスタックポインタは SP レジスタである。
+   MOV 命令のオペランドに SP レジスタを指定できるため、
+   MOV 命令によってスタックポインタの値を簡単に取得できる。
+
+   プログラムの例: ~copy-sp.s~ (図 [[fig:arm/ex/copy-sp.s]])
+   #+caption: arm/ex/copy-sp.s
+   #+label: fig:arm/ex/copy-sp.s
+   #+include: "code/arm/ex/copy-sp.s" src asm-a64
+   #+end_answer
+
+14. プログラムカウンタの値をレジスタ X0 にコピーするアセンブリ言語プロ
+    グラムを示せ。
+
+   #+begin_answer
+   他のアーキテクチャと同じように、
+   Armv8-A アーキテクチャでも、
+   プログラムカウンタの値を MOV 命令で直接取得することはできない。
+   
+   IA-32 アーキテクチャではプログラムカウンタの取得には一工夫が必要であった ([[sec:x86ctrl/quiz]] 節) が、
+   Armv8-A アーキテクチャでは ADR 命令によって簡単に取得できる。
+   ADR 命令のオフセットに 0 を指定すれば、
+   現在のプログラムカウンタの値が取得できる。
+
+   プログラムの例: ~copy-pc.s~ (図 [[fig:arm/ex/copy-pc.s]])
+   #+caption: arm/ex/copy-pc.s
+   #+label: fig:arm/ex/copy-pc.s
+   #+include: "code/arm/ex/copy-pc.s" src asm-a64
+   #+end_answer

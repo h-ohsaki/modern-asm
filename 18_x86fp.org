@@ -1,0 +1,1230 @@
+﻿# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* x86 命令セット (浮動小数点演算)
+<<ch:x86fp>>
+
+** IA-32 アーキテクチャにおける浮動小数点演算
+<<sec:x86fp/intro>>
+
+ここまで、
+主要な x86 命令セットを一通り説明しました。
+ただし、
+これまでに説明した命令は、
+IA-32 アーキテクチャでは汎用命令 ([[sec:x86regs/category]] 節) に分類される命令のみです。
+さまざまなデータ転送命令や、
+算術演算命令、
+論理演算命令などを説明しましたが、
+すべて整数を扱う命令ばかりでした。
+
+[[sec:floating-point-nubmer]] 節で述べたように、
+多くの場合、
+コンピュータは実数を浮動小数点数として扱います。
+IA-32 アーキテクチャにも、
+当然ながら浮動小数点数に対するデータ転送命令や算術命令が存在します。
+
+そこで以下では、
+IA-32 アーキテクチャにおける浮動小数点演算のための命令を紹介します。
+
+** x87 FPU (浮動小数点ユニット)
+<<sec:x86fp/x87fpu>>
+
+IA-32 アーキテクチャの CPU には、
+浮動小数点演算のための独立したハードウェアである *浮動小数点ユニット FPU (Floating Point Unit)* が存在します。
+
+インテル 80x86 シリーズの CPU は、
+当初、
+浮動小数点演算のためのハードウェアを持っていませんでした。
+というのも、
+初期の CPU が浮動小数点演算のハードウェアを持っていないことは珍しいことではなく、
+当時、
+高速な浮動小数点演算が必要な場合は、
+浮動小数点演算のためのハードウェア (数値演算用コプロセッサ) を CPU とは別に搭載することも一般的でした。
+
+こういった歴史的な経緯もあり、
+IA-32 アーキテクチャの CPU は、
+浮動小数点演算のためのハードウェアが CPU 内部で独立しています。
+現在の IA-32 アーキテクチャの CPU は、
+CPU 内部に浮動小数点演算のための x87 FPU を内蔵していますが、
+今でも論理的には独立したハードウェアのように見えます。
+
+インテルが設計・製造していた、
+数値演算用のコプロセッサの名称が 8087、
+80187、
+80287、
+80387 という名称だったこともあり、
+IA-32 アーキテクチャの浮動小数点ユニットは *x87* と呼ばれています。
+
+浮動小数点ユニットはもともと CPU の外付けだったこともあり、
+IA-32 アーキテクチャにおける整数演算と浮動小数点演算は、
+まったくといっていいほど異なる仕組みになっています。
+
+以下では、
+x87 FPU の概要と、
+x87 FPU を使ったアセンブリ言語プログラミングの基礎を説明します。
+
+#+begin_note
+ただし、
+後ほど [[ch:x86-64]] 章で説明するように、
+64 ビット環境 (Intel 64) では、
+浮動小数点演算には x87 FPU を使用しません。
+また、
+アセンブリ言語で実数を扱いたい場合には、
+浮動小数点を使うのではなく、
+固定小数点を使うという選択肢もあります ([[sec:fixed-point-nubmer]] 節)。
+つまり、
+アセンブリ言語プログラミングの用途によっては、
+必ずしも浮動小数点演算は必須ではありません。
+さらに、
+後述 ([[sec:x86fp/x87-model]] 節) のように、
+x87 FPU による浮動小数点演算にはかなり癖があります。
+
+現在も広く使われていて、
+長い歴史のある x87 FPU の原理を理解することは有用といえます。
+特に、
+x87 FPU が採用しているスタック型のレジスタは技術的にも興味深いものがあります。
+
+ただし、
+x87 FPU の技術的な詳細は、
+未来のアセンブリ言語プログラミングには必須の知識ではなくなっているもしれません。
+#+end_note
+
+*** x87 FPU のデータレジスタと実行環境
+
+x87 FPU は、
+CPU の汎用レジスタやフラグレジスタとは別に *専用のレジスタ* を持っています (図 [[fig:x86fp/reg]])。
+
+#+caption: x87 FPU の実行環境
+#+label: fig:x86fp/reg
+[[./figure/x86fp/reg.png]]
+
+データレジスタ R0〜R7 は 80 ビットの浮動小数点用レジスタです。
+IEEE 754 の単精度は 32 ビット、
+IEEE 754 の倍精度は 64 ビットでした (表 [[tab:number/ieee754]]) が、
+x87 FPU のデータレジスタの大きさは倍精度を超える 80 ビットです。
+80 ビットの浮動小数点表現は *拡張倍精度 (extended double precision)* と呼ばれています (表 [[tab:number/ieee754]])。
+
+データレジスタのビット数が大きいことは、
+数値計算の精度が向上するためよいことだといえますが、
+IEEE 754 の倍精度で計算している他のコンピュータと、
+80 ビットの拡張倍精度で計算している x87 FPU で結果が一致しない可能性があるため注意が必要です。
+
+x87 FPU のデータレジスタは、
+IA-32 アーキテクチャの汎用レジスタやフラグレジスタからは独立しています。
+このため、
+データレジスタを操作しても、
+汎用レジスタやフラグレジスタ EFLAGS は基本的に影響を受けません。
+逆に、
+汎用レジスタや EFLAGS を操作しても、
+x87 FPU のデータレジスタは影響を受けません。
+
+#+begin_note
+ただし、
+後述する SIMD 命令のための MMX レジスタと、
+x87 FPU のデータレジスタの実体は同じです。
+したがって、
+x87 FPU レジスタを操作すると、
+MMX レジスタが書き変わってしまいます。
+x87 FPU 命令と MMX 命令の両方を使用する場合は注意が必要です。
+#+end_note
+
+データレジスタ以外に、
+特に重要なのは制御レジスタとステータスレジスタです。
+
+*** 制御レジスタ
+
+x87 FPU の *制御レジスタ (control register)* は 16 ビットのレジスタです。
+「制御レジスタ」という名前のとおり、
+プログラマが、
+制御レジスタの各ビットをセットしたりクリアしたりすることによって、
+x87 FPU に対して指令を出します (つまり、
+x87 FPU を制御します)。
+
+x87 FPU は、
+通常、
+ゼロによる除算やオーバフロー、
+アンダーフローなどで例外を発生させますが、
+どのような条件で例外を発生させないか (例外を無視するか) を 6 ビットの *例外マスク (exception mask)* で設定できます。
+
+また 2 ビットの *精度制御 (precision control) ビット* の値により、
+x87 FPU による演算精度を、
+単精度 (0b00)、
+倍精度 (0b10)、
+拡張倍精度 (0b11) に設定できます。
+
+他にも数値演算の丸め方法を 2 ビットの *丸め制御 (rounding control) ビット* で設定することができます。
+
+*** ステータスレジスタ
+
+制御レジスタは、
+「制御」のためのレジスタであり、
+プログラマが値を設定するレジスタでした。
+
+一方、
+*ステータスレジスタ* は、
+x87 FPU による演算結果 (ステータス) によって値が設定されるレジスタです。
+整数演算の結果がフラグレジスタ EFLAGS に反映されるのと同じように、
+浮動小数点演算の結果が x87 FPU のステータスレジスタに反映されます。
+
+ステータスレジスタは、
+- 現在のスタックのトップの位置 (0〜7) を表す 3 ビットの TOP (Top of
+  Stack)
+- 浮動小数点演算の結果によって設定される 3 ビットの条件コードフラグ
+  (condition code flag) C0〜C3
+- 例外の発生の有無を表す 1 ビットの例外要約ステータス ES (Exception
+  Summary status)
+- どの例外が発生したかを表す 6 ビットの例外フラグ
+などで構成されます。
+他にも、
+x87 FPU の状態を表す 1 ビットの B (Busy)、
+スタックあふれの有無を表す 1 ビットのスタックフォールト SF (Stack Fault) などもあります。
+
+これらの 3 つ (データレジスタ、
+制御レジスタ、
+ステータスレジスタ) が x87 FPU において特に重要なレジスタです。
+
+それ以外のレジスタ (タグレジスタ、
+ラスト命令ポインタ、
+ラストデータポインタ、
+オペコード) についても簡単に説明しておきます。
+
+*** タグレジスタ
+
+*タグレジスタ (tag register)* は、
+80 ビット \times 8 のデータレジスタのそれぞれの状態を表した 16 ビットのレジスタです。
+データレジスタ R0〜R7 の、
+それぞれの状態を 2 ビットで表しています。
+例えば、
+タグレジスタの下位 2 ビットは、
+データレジスタ R0 の状態を表しています。
+
+各 2 ビットの意味は以下のとおりです。
+
+| 2ビットの値 | 意味                                                                  |
+|-------------+-----------------------------------------------------------------------|
+|          00 | 有効な値                                                              |
+|          01 | ゼロである                                                            |
+|          10 | 特別な値: 無効 (NaN、サポート外)、無限、デノーマル数 (極めて小さい値) |
+|          11 | 空                                                                    |
+
+*** ラスト命令ポインタ、ラストデータポインタ、オペコード
+
+ラスト命令ポインタ (48 ビット)、
+ラストデータポインタ (48 ビット)、
+オペコード (11 ビット) は、
+x87 FPU において例外が発生した時の状態が記録されます。
+
+例外 (例えばゼロによる除算) が発生した時に、
+x87 FPU は、
+- どのアドレスに格納されている命令を実行していたのか
+- どのアドレスに格納されているメモリ上の値を使っていたのか (使用してい
+  た場合)
+- その時にどの命令を実行していたのか
+を上記のレジスタに記録し、
+これらの情報を例外ハンドラに渡します。
+例外ハンドラ側では、
+「どの種類の例外発生したのか?」
+を表すステータスレジスタの値に加えて、
+これらのレジスタの値も確認して、
+例外の内容に応じて適切な処理を行います。
+
+** x87 FPU による浮動小数点演算
+<<sec:x86fp/x87-model>>
+
+IA-32 アーキテクチャでは、
+レジスタ EAX、
+EBX、
+ECX、
+EDX などが整数演算のための汎用レジスタで、
+データレジスタ R0〜R7 が浮動小数点演算のためのレジスタです。
+
+例えば、
+整数どうしの加算である 123 + 456 は
+#+begin_src asm
+	movl	$123, %eax
+	movl	$456, %ebx
+	addl	%ebx, %eax
+#+end_src
+のように書けます ([[sec:tr-regs/c-to-asm]] 節)。
+
+したがって、
+浮動小数点数どうしの加算である 12.3 + 4.56 は
+#+begin_src asm
+	# 浮動小数点数の加算はこんな感じで書けばいい? (予想)
+	fmovd	$12.3, %r0
+	fmovd	$4.56, %r1
+	faddd	%r1, %r0
+#+end_src
+のように記述すればよいのでは?
+と予想がつきます。
+
+#+begin_note
+ここで、
+fmovd の先頭の f は floating-point (浮動小数点)、
+末尾の d は double-precision (倍精度) というイメージです。
+整数のための MOV 命令に相当する、
+浮動小数点数のための FMOV 命令があるのでは?
+という予想です。
+#+end_note
+
+大変残念ですが、
+その予想は「ハズレ」です。
+前述のように、
+IA-32 アーキテクチャにおける整数演算と浮動小数点演算は、
+まったくといっていいほど仕組みが異なります。
+そのため、
+IA-32 アーキテクチャの x87 FPU では、
+整数演算と同じような方法で浮動小数点の演算を行うことはできません。
+
+#+begin_note
+ちなみに、
+最初から整数演算と浮動小数点演算があることを前提に設計された命令セットアーキテクチャ (例えば [[ch:arm]] 章の Armv8-A アーキテクチャ) では、
+上記のように整数演算と浮動小数点数を同じような形で扱うことができるものもあります。
+#+end_note
+
+x87 FPU では、
+8 個のデータレジスタはなんと *スタック* になっています。
+データレジスタはレジスタの一種ですが、
+これを大きさが 8 のスタックとして利用します (図 [[fig:x86fp/reg-stack]])。
+以下では、
+x87 FPU の「データレジスタ」と「スタック」を同じ意味で用います。
+[[ch:stack]] 章で説明した、
+メモリ上のスタックとは異なるので注意してください。
+
+#+caption: スタックとしての x86 FPU データレジスタ
+#+label: fig:x86fp/reg-stack
+#+attr_latex: :width \columnwidth
+[[./figure/x86fp/reg-stack.png]]
+
+しかも、
+データレジスタは大きさが 8 のリングバッファのようになっています。
+このため、
+スタックが一杯の時にデータをプッシュすると、
+スタックのトップがぐるりと一番上に戻ります。
+つまり、
+スタックのトップがデータレジスタ R0 の時に、
+さらにデータをプッシュすると、
+スタックのトップが一周してデータレジスタ R7 になります (当然、
+データレジスタ R7 に格納されていたデータは上書きされてしまいます)。
+
+#+begin_note
+メモリ上のスタックは、
+アドレスが下位の方向へ伸びてゆきます。
+このため、
+[[ch:stack]] 章ではスタックの先頭を「スタックの一番上」と表記していました。
+
+x87 FPU のスタックは、
+図 [[fig:x86fp/reg-stack]] のようにデータレジスタの下の方向に伸びてゆきます。
+このため、
+本章ではスタックの先頭を「スタックのトップ」と表記しています。
+#+end_note
+
+x87 FPU のデータレジスタには以下のような制限があります。
+
+- データレジスタへの値の追加/取り出しは、スタックへのプッシュ/ポップで
+  のみ行える (スタックのトップ以外のデータレジスタに書き込んだり、デー
+  タレジスタの値を読み出したりはできない)。
+  - ただし、スタックのトップの値と、スタック内の他の値との交換はできる。
+- 加算や乗算などの浮動小数点数に対する演算は、最大でも 2 つのオペラン
+  ドに対してのみ可能 (例えば、「データレジスタのすべての値の和」を 1命
+  令で計算することはできない)
+  - しかも、オペランドの 1 つは必ずスタックのトップの値でなければなら
+    ない。
+  - オペランドが 2 つの時、他方のオペランドはスタック内の値か、メモリ
+    上の値か、即値 (ただし整数のみ) でなければならない。
+  - 演算結果は、スタック上にしか格納できない。
+
+#+begin_note
+始めて x87 FPU のデータレジスタの仕組みを知ると、
+「なぜこんなに複雑な仕組みになっているのだろう?」
+と疑問に思うかもしれません。
+また、
+「こういう複雑な仕組みにせずに『データレジスタ R0〜R7 は、
+汎用レジスタと同じように自由にオペランドに指定できる』とすればよかったのに」と思うかもしれません。
+
+ただ、
+8087 が設計された時代を考えると、
+これはこれでよく考えられたハードウェアになっています。
+このあたりに興味のある方は、
+例えば文献 \cite{Kahan90:8087} を読んでみてください。
+#+end_note
+
+したがって、
+例えば 12.3 + 4.56 = 16.86 を計算するためには、
+スタックを使って以下のように計算します。
+
+1. スタックに 12.3 をプッシュする
+2. スタックに 4.56 をプッシュする
+3. スタックのトップの値を、スタックの 2 番目の値に加算する (スタックの
+   2 番目の値が 16.86 になる)
+4. スタックのトップの値をポップして捨てる (12.3 を捨てる)
+5. スタックのトップの値をポップする (16.86 を取り出す)
+
+実際のプログラムを見てみましょう。
+まず、12.3 + 4.56 を計算するプログラムを C 言語で書きます。
+
+#+caption: x86fp/add.c
+#+label: fig:x86fp/add.c
+#+include: "code/x86fp/add.c" src C
+
+以下のコンパイル時オプションを付けてコンパイルし、
+アセンブリ言語プログラム ~add.s~ を得ます。
+#+begin_src sh
+$ gcc -fno-pic -fomit-frame-pointer -S add.c
+#+end_src
+
+これまでと同様に、
+アセンブラの疑似命令などを削除し、
+筆者がコメントを付けたものを以下に示します。
+
+#+caption: x86fp/add.ss
+#+label: fig:x86fp/add.ss
+#+include: "code/x86fp/add.ss" src asm
+
+これを見ると、
+上の説明と同じ手順になっていることがわかります。
+
+1. スタックに 12.3 をプッシュする
+
+  アドレス ~x~ に倍精度の浮動小数点数である 12.3 が格納されているので、
+  #+begin_src asm
+          fldl    x
+  #+end_src
+  によってスタックに 12.3 をプッシュしています。
+
+2. スタックに 4.56 をプッシュする
+
+  同様に、
+  アドレス ~y~ に倍精度の浮動小数点数である 4.56 が  格納されているので、
+  #+begin_src asm
+          fldl    y
+  #+end_src
+  によってスタックに 4.56 をプッシュしています。
+
+3. スタックのトップの値を、スタックの 2 番目の値に加算する (スタックの
+   2 番目の値が 16.86 になる)
+
+4. スタックのトップの値をポップして捨てる (12.3 を捨てる)
+
+  上の 2 つの処理をあわせて実行しているのが
+  #+begin_src asm
+          faddp   %st, %st(1)
+  #+end_src
+  です。
+  ここで、
+  出所オペランド ~%st~ がスタックのトップ (~%st(0)~ とも表記できます) を、
+  宛先オペランド ~%st(1)~ がスタックの 2 番目を意味します。
+  これにより、
+  スタックのトップの値が、
+  スタックの 2 番目の値に加算されます。
+  FADDP 命令では、
+  さらに、
+  スタックのトップがポップされます (ポップされた値は単に捨てられます)。
+
+5. スタックのトップの値をポップする (16.86 を取り出す)
+
+  最後に、
+  #+begin_src asm
+          fstpl   z
+  #+end_src
+  によって、
+  スタックのトップに格納されている 16.86 を取り出して、
+  ラベル ~z~ が指すメモリに格納しています。
+
+** x87 FPU 命令の概要
+<<sec:x86fp/x87-inst>>
+
+では、
+IA-32 アーキテクチャの x87 FPU に、
+どのような命令があるのかを眺めてみましょう。
+以下では、
+x87 FPU 命令の一覧を示すとともに、
+命令の一覧から x87 FPU 命令の特徴を眺めてみます。
+x87 FPU 命令の詳細については文献 \cite{Intel04:IA32J-1,Intel04:IA32J-2A,Intel04:IA32J-2B} を参照してください。
+
+*** x87 FPU データ転送命令
+
+まず、
+データレジスタのスタックをプッシュおよびポップする命令の一覧です (文献 \cite{Intel04:IA32J-1} より抜粋)。
+
+| FLD      | Load floating-point value                                |
+|          | 浮動小数点値をロード                                     |
+| FST      | Store floating-point value                               |
+|          | 浮動小数点値をストア                                     |
+| FSTP     | Store floating-point value and pop                       |
+|          | 浮動小数点値をストアしてポップ                           |
+| FILD     | Load integer                                             |
+|          | 整数をロード                                             |
+| FIST     | Store integer                                            |
+|          | 整数をストア                                             |
+| FISTP1   | Store integer and pop                                    |
+|          | 整数をストアしてポップ                                   |
+| FBLD     | Load BCD                                                 |
+|          | BCD をロード                                             |
+| FBSTP    | Store BCD and pop                                        |
+|          | BCD をストアしてポップ                                   |
+| FXCH     | Exchange registers                                       |
+|          | レジスタを交換                                           |
+| FCMOVE   | Floating-point conditional move if equal                 |
+|          | 等しい場合は浮動小数点値の条件付き転送                   |
+| FCMOVNE  | Floating-point conditional move if not equal             |
+|          | 等しくない場合は浮動小数点値の条件付き転送               |
+| FCMOVB   | Floating-point conditional move if below                 |
+|          | より小さい場合は浮動小数点値の条件付き転送               |
+| FCMOVBE  | Floating-point conditional move if below or equal        |
+|          | より小さいか等しい場合は浮動小数点値の条件付き転送       |
+| FCMOVNB  | Floating-point conditional move if not below             |
+|          | より小さくない場合は浮動小数点値の条件付き転送           |
+| FCMOVNBE | Floating-point conditional move if not below or equal    |
+|          | より小さくなく等しくない場合は浮動小数点値の条件付き転送 |
+| FCMOVU   | Floating-point conditional move if unordered             |
+|          | 順序化不可能の場合は浮動小数点値の条件付き転送           |
+| FCMOVNU  | Floating-point conditional move if not unordered         |
+|          | 順序化不可能でない場合は浮動小数点値の条件付き転送       |
+
+x87 FPU では、
+スタックにプッシュする操作を *ロード (load)* 、
+スタックからポップする操作を *ストア (store)* と呼んでいます。
+名前はロードやストアですが、
+データレジスタであるスタックへのプッシュや、
+スタックからのポップを行う命令です。
+
+データ転送命令の一覧を眺めると、
+x87 FPU は、
+浮動小数点数だけでなく、
+整数や BCD (Binary Coded Decimal) の値も扱えることがわかります。
+ただし、
+スタックへのロード時や、
+スタックからのストア時に整数や BCD との型変換ができるだけです。
+x87 FPU 内部での演算はすべて浮動小数点数として行われます。
+
+*** x87 FPU 基本算術命令
+
+四則演算などの算術演算命令の一覧です (文献 \cite{Intel04:IA32J-1} より抜粋)。
+
+#+attr_latex: :environment longtable :align lp{35zw} :float t
+| FADD    | Add floating-point                      |
+|         | 浮動小数点値を加算                      |
+| FADDP   | Add floating-point and pop              |
+|         | 浮動小数点値を加算してポップ            |
+| FIADD   | Add integer                             |
+|         | 整数を加算                              |
+| FSUB    | Subtract floating-point                 |
+|         | 浮動小数点値を減算                      |
+| FSUBP   | Subtract floating-point and pop         |
+|         | 浮動小数点値を減算してポップ            |
+| FISUB   | Subtract integer                        |
+|         | 整数を減算                              |
+| FSUBR   | Subtract floating-point reverse         |
+|         | 浮動小数点値を逆減算                    |
+| FSUBRP  | Subtract floating-point reverse and pop |
+|         | 浮動小数点値を逆減算してポップ          |
+| FISUBR  | Subtract integer reverse                |
+|         | 整数を逆減算                            |
+| FMUL    | Multiply floating-point                 |
+|         | 浮動小数点値を乗算                      |
+| FMULP   | Multiply floating-point and pop         |
+|         | 浮動小数点値を乗算してポップ            |
+| FIMUL   | Multiply integer                        |
+|         | 整数を乗算                              |
+| FDIV    | Divide floating-point                   |
+|         | 浮動小数点値を除算                      |
+| FDIVP   | Divide floating-point and pop           |
+|         | 浮動小数点値を除算してポップ            |
+| FIDIV   | Divide integer                          |
+|         | 整数を除算                              |
+| FDIVR   | Divide floating-point reverse           |
+|         | 浮動小数点値を逆除算                    |
+| FDIVRP  | Divide floating-point reverse and pop   |
+|         | 浮動小数点値を逆除算してポップ          |
+| FIDIVR  | Divide integer reverse                  |
+|         | 整数を逆除算                            |
+| FPREM   | Partial remainder                       |
+|         | 部分剰余                                |
+| FPREM1  | IEEE Partial remainder                  |
+|         | IEEE 部分剰余                           |
+| FABS    | Absolute value                          |
+|         | 絶対値                                  |
+| FCHS    | Change sign                             |
+|         | 符号を変更                              |
+| FRNDINT | Round to integer                        |
+|         | 整数への丸め                            |
+| FSCALE  | Scale by power of two                   |
+|         | 2 のべき乗でスケーリング                |
+| FSQRT   | Square root                             |
+|         | 平方根                                  |
+| FXTRACT | Extract exponent and significand        |
+|         | 指数部と仮数部を抽出                    |
+
+x87 FPU は「数値演算用コプロセッサ」と言うだけあって、
+基本的な算術演算が可能です。
+加算や、
+減算、
+乗算、
+除算はもちろんのこと、
+絶対値や、
+平方根の計算もできることがわかります。
+
+前述のように、
+x87 FPU では、
+加算命令や減算命令、
+乗算命令、
+除算命令の一方のオペランドは必ずスタックのトップの値でなければなりません。
+他方のオペランドが整数の場合に限り、
+オペランドに即値を指定することできます。
+
+*** x87 FPU 比較命令
+
+浮動小数点数の大小比較を行うための比較命令です (文献 \cite{Intel04:IA32J-1} より抜粋)。
+
+| FCOM    | Compare floating-point                                    |
+|         | 浮動小数点値を比較                                        |
+| FCOMP   | Compare floating-point and pop                            |
+|         | 浮動小数点値を比較してポップ                              |
+| FCOMPP  | Compare floating-point and pop twice                      |
+|         | 浮動小数点値を比較して 2 回ポップ                         |
+| FUCOM   | Unordered compare floating-point                          |
+|         | 順序化不可能条件付きで浮動小数点値を比較                  |
+| FUCOMP  | Unordered compare floating-point and pop                  |
+|         | 順序化不可能条件付きで浮動小数点値を比較してポップ        |
+| FUCOMPP | Unordered compare floating-point and pop twice            |
+|         | 順序化不可能条件付きで浮動小数点値を比較して 2 回ポップ   |
+| FICOM   | Compare integer                                           |
+|         | 整数を比較                                                |
+| FICOMP  | Compare integer and pop                                   |
+|         | 整数を比較してポップ                                      |
+| FCOMI   | Compare floating-point and set EFLAGS                     |
+|         | 浮動小数点値を比較して EFLAGS をセット                    |
+| FUCOMI  | Unordered compare floating-point and set EFLAGS           |
+|         | 順序化不可能条件付きで浮動小数点値を比較して EFLAGS を    |
+|         | セット                                                    |
+| FCOMIP  | Compare floating-point, set EFLAGS, and pop               |
+|         | 浮動小数点値を比較し、EFLAGS をセットしてポップ           |
+| FUCOMIP | Unordered compare floating-point, set EFLAGS, and pop     |
+|         | 順序化不可能条件付きで浮動小数点値を比較し、EFLAGS をセッ |
+|         | トしてポップ                                              |
+| FTST    | Test floating-point                                       |
+|         | 浮動小数点値をテスト                                      |
+| FXAM    | Examine floating-point                                    |
+|         | 浮動小数点値を検査                                        |
+
+基本的に、
+スタックのトップの値と、
+スタック内の他の値との比較を行います。
+ただし、
+比較する値が整数であれば、
+オペランドに即値を指定できる命令もあります。
+
+比較結果は、
+基本的に (フラグレジスタ EFLAGS ではなく) x87 FPU のステータスレジスタに保存されます。
+ただし、
+命令によっては比較結果をフラグレジスタ EFLAGS に保存するものもあります。
+
+「順序化不可能条件付き」という説明が書かれた命令がありますが、
+これらはオペランドの値が、
+NaN ([[sec:floating-point-nubmer]] 節) のように、
+値の順序が定まらないような値かどうかのチェックもあわせて行う命令です。
+
+*** x87 FPU 超越関数命令
+
+「超越関数」というのは耳慣れない用語で、
+何だかすごそうな関数にも聞こえますが、
+transcendental function という数学用語の日本語訳であり、
+「代数関数で表すことができない関数」を意味します。
+
+超越関数の例が三角関数、
+指数関数、
+対数関数です。
+下の超越関数命令の一覧 (文献 \cite{Intel04:IA32J-1} より抜粋) を見てもわかるとおり、
+「超越関数命令」とは三角関数、
+指数関数、
+対数関数 (の一部) を計算する命令です。
+
+| FSIN    | Sine               |
+|         | 正弦               |
+| FCOS    | Cosine             |
+|         | 余弦               |
+| FSINCOS | Sine and cosine    |
+|         | 正弦と余弦         |
+| FPTAN   | Partial tangent    |
+|         | 部分正接           |
+| FPATAN  | Partial arctangent |
+|         | 部分逆正接         |
+| F2XM1   | $2^x - 1$         |
+| FYL2X   | $y \log_2 x$       |
+| FYL2XP1 | $y \log_2 (x + 1)$ |
+
+指数関数は 2 のべき乗である $2^x - 1$ のみ、
+対数関数は底が 2 の対数関数のみです。
+「2 のべき乗と、
+底が 2 の対数関数だけでは困るのでは?」
+と思いますが、
+$a$ のべき乗や、
+底が $a$ の対数は以下のように計算できます。
+
+\begin{align}
+  a^x & = 2^{x \log_2 a} \label{eq:ax} \\
+  \log_a x & = \frac{\log_2 x}{\log_2 a} \label{eq:logax}
+\end{align}
+
+式 (\ref{eq:ax}) は以下のように得られます。
+
+まず、
+$a^x$ を $a^x = y$ と置きます。
+両辺の対数 (底が 2) を取ると $\log_2 a^x = \log_2 y$ より
+\begin{align}
+  x \log_2 a & = \log_2 y \label{eq:xlog2a}
+\end{align}
+となります。
+今、
+求めたいのは $y \, (= a^x)$ です。
+対数の定義より、
+$y = 2^{\log_2 y}$ なので、
+式 (\ref{eq:xlog2a}) を用いて
+\begin{align}
+  y = 2^{\log_2 y} = 2^{x \log_2 a}
+\end{align}
+が得られます。
+
+式 (\ref{eq:logax}) は底の変換公式 $\log_a x = \log_b x / \log_b a$ で $b = 2$ と置いています。
+
+#+begin_note
+なお、
+$2^x - 1$ を計算する F2XM1 命令は、
+$x$ の値が $-1 \le x \le 1$ (つまり、
+$|x| \le 1$) である必要があります。
+$x$ がこの範囲に収まらない場合は、
+$x$ の整数部 $\lfloor x \rfloor$ を用いて
+\begin{align}
+  a^x = a^{\lfloor x \rfloor + (x - \lfloor x \rfloor)}
+  = a^{\lfloor x \rfloor} \times a^{(x - \lfloor x \rfloor)}
+\end{align}
+のように計算します。
+
+$a^{\lfloor x \rfloor}$ の部分は FSCALE 命令で、
+$a^{(x - \lfloor x \rfloor)}$ の部分は F2XM1 命令で計算できます。
+#+end_note
+
+*** x87 FPU 定数ロード命令
+
+次は、
+数値計算でよく用いられる定数をスタックにプッシュする命令 (定数ロード命令) です。
+定数ロード命令の一覧を以下に示します (文献 \cite{Intel04:IA32J-1} より抜粋)。
+
+| FLD1   | Load +1.0          |
+|        | +1.0 をロード      |
+| FLDZ   | Load +0.0          |
+|        | +0.0 をロード      |
+| FLDPI  | Load \pi           |
+|        | \pi をロード       |
+| FLDL2E | Load $\log_2 e$    |
+|        | $\log_2 e$ をロード |
+| FLDLN2 | Load $\log_e 2$    |
+|        | $\log_e 2$ をロード |
+| FLDL2T | Load $\log_2 10$   |
+|        | $\log_2 10$ をロード |
+| FLDLG2 | Load $\log_{10} 2$ |
+|        | $\log_{10} 2$ をロード |
+
+以下のように、
+メモリ上にこれらの定数を配置しておいて、
+FLD 命令でスタックにプッシュしてももちろんかまいません。
+
+#+caption: x86fp/load.s
+#+label: fig:x86fp/load.s
+#+include: "code/x86fp/load.s" src asm
+
+ただし、
+このような値はよく使われるため、
+利便性のために、
+x87 FPU 命令 1 つでスタックに読み込めるようになっています。
+
+*** x87 FPU 制御命令
+
+x87 FPU 制御命令は、
+x87 FPU のデータレジスタ、
+制御レジスタ、
+ステータスレジスタなどを操作するための命令です。
+x87 FPU 制御命令の一覧を以下に示します (文献 \cite{Intel04:IA32J-1} より抜粋)。
+
+| FINCSTP    | Increment FPU register stack pointer                                       |
+|            | FPU レジスタのスタックポインタをインクリメント                             |
+| FDECSTP    | Decrement FPU register stack pointer                                       |
+|            | FPU レジスタのスタックポインタをデクリメント                               |
+| FFREE      | Free floating-point register                                               |
+|            | 浮動小数点レジスタを解放                                                   |
+| FINIT      | Initialize FPU after checking error conditions                             |
+|            | エラー条件をチェックしてから FPU を初期化                                  |
+| FNINIT     | Initialize FPU without checking error conditions                           |
+|            | エラー条件をチェックせずに FPU を初期化                                    |
+| FCLEX      | Clear floating-point exception flags after checking for error conditions   |
+|            | エラー条件をチェックしてから浮動小数点例外フラグをクリア                   |
+| FNCLEX     | Clear floating-point exception flags without checking for error conditions |
+|            | エラー条件をチェックせずに浮動小数点例外フラグをクリア                     |
+| FSTCW      | Store FPU control word after checking error conditions                     |
+|            | エラー条件をチェックしてから FPU 制御ワードをストア                        |
+| FNSTCW     | Store FPU control word without checking error conditions                   |
+|            | エラー条件をチェックせずに FPU 制御ワードをストア                          |
+| FLDCW      | Load FPU control word                                                      |
+|            | FPU 制御ワードをロード                                                     |
+| FSTENV     | Store FPU environment after checking error conditions                      |
+|            | エラー条件をチェックしてから FPU 環境をストア                              |
+| FNSTENV    | Store FPU environment without checking error conditions                    |
+|            | エラー条件をチェックせずに FPU 環境をストア                                |
+| FLDENV     | Load FPU environment                                                       |
+|            | FPU 環境をロード                                                           |
+| FSAVE      | Save FPU state after checking error conditions                             |
+|            | エラー条件をチェックしてから FPU ステートをセーブ                          |
+| FNSAVE     | Save FPU state without checking error conditions                           |
+|            | エラー条件をチェックせずに FPU ステートをセーブ                            |
+| FRSTOR     | Restore FPU state                                                          |
+|            | FPU ステートをリストア                                                     |
+| FSTSW      | Store FPU status word after checking error conditions                      |
+|            | エラー条件をチェックしてから FPU ステータス・ワードをストア                |
+| FNSTSW     | Store FPU status word without checking error conditions                    |
+|            | エラー条件をチェックせずに FPU ステータス・ワードをストア                  |
+| WAIT/FWAIT | Wait for FPU                                                               |
+|            | FPU を待機                                                                 |
+| FNOP       | FPU no operation                                                           |
+|            | FPU の非操作                                                               |
+
+データレジスタの内容は変えずに、
+スタックのトップの位置を操作する命令や、
+データレジスタ、
+制御レジスタ、
+ステータスレジスタなどを初期化する命令、
+x87 FPU の状態をメモリに書き出したり、
+x87 FPU の状態をメモリから読み込む命令が並んでいます。
+
+** デバッガによるトレース
+
+x87 FPU の浮動小数点演算命令を使ったプログラムの動作をデバッガを使って追い掛けてみましょう。
+
+4 つの浮動小数点数の合計 (1.111 + 2.222 + 3.333 + (-4.444) = 2.222) を計算するプログラム ~sum.s~ (図 [[fig:x86fp/sum.s]]) です。
+
+#+caption: x86fp/sum.s
+#+label: fig:x86fp/sum.s
+#+include: "code/x86fp/sum.s" src asm
+
+x87 FPU のスタックを使って数の和を計算する方法は何とおりかあります。
+このプログラムでは、
+以下のような考え方で 4 つの数の和を計算しています。
+
+1. スタックに 0 (初期値) をプッシュする
+2. スタックのトップの値に、1 番目の値 1.111 を加算する
+3. スタックのトップの値に、2 番目の値 2.222 を加算する
+4. スタックのトップの値に、3 番目の値 3.333 を加算する
+5. スタックのトップの値に、4 番目の値 -4.444 を加算する
+6. スタックのトップの値をポップし、~sum~ 番地にコピーする
+7. スタックのトップの値を捨てる
+
+まず、
+これまでに扱ったアセンブリ言語プログラムと同じように、
+プログラム ~sum.s~ をアセンブルおよびリンクし、
+実行ファイル ~sum~ を生成します。
+#+begin_src sh
+$ as -o sum.o sum.s
+$ ld -o sum sum.o
+#+end_src
+
+デバッガの監視下で x87 FPU の動作をトレースしましょう。
+今回は、
+以下のような ~.gdbinit~ ファイルを用意しておきます。
+
+#+caption: x86fp/.gdbinit
+#+label: fig:x86fp/.gdbinit
+#+include: "code/x86fp/.gdbinit" src gdb
+
+ここでは、
+GDB の define コマンドを使って、
+「sf」という名前のユーザ定義コマンドを定義しています。
+
+というのも、
+GDB では、
+「info float」コマンドによって、
+x87 FPU のデータレジスタの値をダンプすることができます。
+x87 FPU 命令の動作をトレースするためには、
+「stepi コマンドで 1 命令実行して、
+info float コマンドでデータレジスタの変化をチェックする」ようにすると便利です。
+そこでここでは、
+2 つのコマンドをまとめてできる sf コマンドを定義しています。
+GDB におけるユーザ定義コマンドの使い方については、
+GDB のドキュメント /(gdb)Define/ を参照してください。
+
+デバッガの監視下でプログラム ~sum~ を起動します。
+
+#+begin_src gdb
+$ gdb -q sum
+Reading symbols from sum...
+(No debugging symbols found in sum)
+Breakpoint 1 at 0x8049000
+(gdb) r ← プログラムの実行を開始 (run コマンドの省略形)
+Starting program: /home/ohsaki/code/x86fp/sum 
+
+Breakpoint 1, 0x08049000 in _start ()
+1: /x $eax = 0x0
+2: x/4i $pc
+=> 0x8049000 <_start>:	fldz   
+   0x8049002 <_start+2>:	mov    $0x0,%eax
+   0x8049007 <_start+7>:	faddl  0x804a008(,%eax,8)
+   0x804900e <_start+14>:	inc    %eax
+(gdb) 
+#+end_src
+
+~.gdbinit~ ファイル中で定義した sf コマンドを使えば、
+現在のプログラムカウンタの命令を 1 つ実行し、
+x87 FPU の状態をダンプします。
+最初の命令は「fldz」です。
+スタックのトップにゼロがロードされます。
+#+begin_src gdb
+(gdb) sf ← ~/.gdbinit で定義したユーザ定義コマンドを実行
+0x08049002 in _start ()
+1: /x $eax = 0x0
+2: x/4i $pc
+=> 0x8049002 <_start+2>:	mov    $0x0,%eax
+   0x8049007 <_start+7>:	faddl  0x804a008(,%eax,8)
+   0x804900e <_start+14>:	inc    %eax
+   0x804900f <_start+15>:	cmp    $0x4,%eax
+=>R7: Zero    0x00000000000000000000 +0         ← x87 FPU データレジスタの状態
+  R6: Empty   0x00000000000000000000               (=> がスタックのトップを表す)
+  R5: Empty   0x00000000000000000000
+  R4: Empty   0x00000000000000000000
+  R3: Empty   0x00000000000000000000
+  R2: Empty   0x00000000000000000000
+  R1: Empty   0x00000000000000000000
+  R0: Empty   0x00000000000000000000
+
+Status Word:         0x3800                     ← ステータスレジスタの状態     
+                       TOP: 7
+Control Word:        0x037f   IM DM ZM OM UM PM ← 制御レジスタの状態
+                       PC: Extended Precision (64-bits)
+                       RC: Round to nearest
+Tag Word:            0x7fff ← タグレジスタの状態
+Instruction Pointer: 0x00:0x08049002            ← ラスト命令ポインタの値
+Operand Pointer:     0x00:0x00000000            ← ラストデータポインタの値
+Opcode:              0x0000                     ← オペコードの値
+(gdb) 
+#+end_src
+
+x87 FPU の状態がダンプされていることがわかります。
+データレジスタや、
+ステータスレジスタ、
+制御レジスタ、
+ラスト命令ポインタ、
+ラストデータポインタ、
+オペコードなどの詳細な情報が表示されています。
+
+基本的に、
+x87 FPU のデータレジスタ (スタック) の変化に注目して見てゆきます。
+例えば、
+#+begin_src raw
+=>R7: Zero    0x00000000000000000000 +0
+#+end_src
+により、
+スタックのトップがレジスタ R7 で、
+スタックのトップにはゼロ (+0) がロードされていることがわかります。
+
+sf コマンドを 2 回実行して、
+\inst{mov $0x0,%eax} と \inst{faddl 0x804a008(,%eax,8)} の 2 命令を実行します。
+
+#+begin_src gdb
+(gdb) ← リターンキーを押す (sf コマンドの繰り返し)
+	:
+	:
+(gdb)  ← リターンキーを押す (sf コマンドの繰り返し)
+0x0804900e in _start ()
+1: /x $eax = 0x0
+2: x/4i $pc
+=> 0x804900e <_start+14>:	inc    %eax
+   0x804900f <_start+15>:	cmp    $0x4,%eax
+   0x8049012 <_start+18>:	jl     0x8049007 <_start+7>
+   0x8049014 <_start+20>:	fstpl  0x804a000
+=>R7: Valid   0x3fff8e353f7ced916800 +1.110999999999999988
+  R6: Empty   0x00000000000000000000
+  R5: Empty   0x00000000000000000000
+  R4: Empty   0x00000000000000000000
+  R3: Empty   0x00000000000000000000
+  R2: Empty   0x00000000000000000000
+  R1: Empty   0x00000000000000000000
+  R0: Empty   0x00000000000000000000
+	:
+	:
+(gdb) 
+#+end_src
+
+\inst{faddl 0x804a008(,%eax,8)} における 0x804a008 はラベル ~v~ のアドレスと考えられます。
+それでは、
+本当にそうなっているか確認してみましょう。
+#+begin_src gdb
+(gdb) p &v ← ラベル v の値を表示
+$3 = (<data variable, no debug info> *) 0x804a008
+(gdb) x/4 &v ← v のアドレスに格納されている値を 4 つ表示
+0x804a008:      1.111   2.222
+0x804a018:      3.3330000000000002      -4.444
+(gdb) 
+#+end_src
+確かに、
+4 つの倍精度浮動小数点数が格納されていることがわかります (3.333 が 3.3330000000000002 となっているのは丸め誤差のためです)。
+
+今、
+EAX レジスタの値は 0 なので、
+\inst{faddl 0x804a008(,%eax,8)} によって、
+スタックのトップに、1.111 が加算されたはずです。
+x87 FPU のスタックのトップは
+#+begin_src raw
+=>R7: Valid   0x3fff8e353f7ced916800 +1.110999999999999988      
+              ↑ 80ビットの16進数表記  ↑ 10進数表記
+#+end_src
+となっています。
+確かに、
+スタックのトップの値 (もともとは 0 でした) に、1.111 が加算されたことがわかります。
+0x3fff 8e35 3f7c ed91 6800 という値が、
+実際にデータレジスタ R7 に格納されている値です。
+その右の +1.110999999999999988 は、
+データレジスタの値を 10 進数で表記したものです。
+ここでも丸め誤差が生じています。
+
+さらに sf コマンドを繰り返し実行して、
+スタックの変化を追い掛けてみてください。
+紙面の都合上、
+ここでは命令の実行中にスタックの変化のみ掲載しておきます。
+
+まず、レジスタ EAX の値が 1 の時に、
+「~faddl v(, %eax, 8)~」を実行した直後のスタックの状態です。
+#+begin_src raw
+=>R7: Valid   0x4000d54fdf3b645a1c00 +3.332999999999999963      
+  R6: Empty   0x00000000000000000000
+  R5: Empty   0x00000000000000000000
+  R4: Empty   0x00000000000000000000
+  R3: Empty   0x00000000000000000000
+  R2: Empty   0x00000000000000000000
+  R1: Empty   0x00000000000000000000
+  R0: Empty   0x00000000000000000000
+#+end_src
+2 番目の値である 2.222 が、
+スタックのトップに加算されていることがわかります。
+
+次に、
+レジスタ EAX の値が 2 の時に、
+\inst{faddl v(, %eax, 8)} を実行した直後のスタックの状態です。
+#+begin_src raw
+=>R7: Valid   0x4001d54fdf3b645a1e00 +6.666000000000000147      
+  R6: Empty   0x00000000000000000000
+  R5: Empty   0x00000000000000000000
+  R4: Empty   0x00000000000000000000
+  R3: Empty   0x00000000000000000000
+  R2: Empty   0x00000000000000000000
+  R1: Empty   0x00000000000000000000
+  R0: Empty   0x00000000000000000000
+#+end_src
+3 番目の値である 3.333 が、
+さらにスタックのトップに加算されました。
+
+同じように、
+レジスタ EAX の値が 3 の時に、
+\inst{faddl v(, %eax, 8)} を実行した直後のスタックの状態です。
+#+begin_src raw
+=>R7: Valid   0x40008e353f7ced916c00 +2.222000000000000197      
+  R6: Empty   0x00000000000000000000
+  R5: Empty   0x00000000000000000000
+  R4: Empty   0x00000000000000000000
+  R3: Empty   0x00000000000000000000
+  R2: Empty   0x00000000000000000000
+  R1: Empty   0x00000000000000000000
+  R0: Empty   0x00000000000000000000
+#+end_src
+4 番目の値である -4.444 が、
+さらにスタックのトップに加算されています。
+これにより、
+4 つの数の和が計算できました。
+
+最後に、
+\inst{fstpl 0x804a000} を実行した直後のスタックの状態です。
+#+begin_src raw
+  R7: Empty   0x40008e353f7ced916c00
+  R6: Empty   0x00000000000000000000
+  R5: Empty   0x00000000000000000000
+  R4: Empty   0x00000000000000000000
+  R3: Empty   0x00000000000000000000
+  R2: Empty   0x00000000000000000000
+  R1: Empty   0x00000000000000000000
+=>R0: Empty   0x00000000000000000000
+#+end_src
+FSTP 命令はスタックのトップの値をポップするので、
+スタックが空になることがわかります。
+
+また、
+0x804 a000 はラベル ~sum~ のアドレスだと考えられます。
+本当にそのとおりか、
+また、
+FSTP 命令によって、
+0x804 a000 番地に計算結果 (2.222) が格納されているか確認しましょう。
+#+begin_src gdb
+(gdb) p &sum
+$1 = (<data variable, no debug info> *) 0x804a000
+(gdb) x 0x804a000
+0x804a000:      2.2220000000000004
+(gdb) 
+#+end_src
+ただし、
+ここでも丸め誤差が発生し、
+計算結果は 2.222 ではなく 2.2220000000000004 となっています。
+
+** コードリーディング
+
+最後に、
+x87 FPU 命令を使った簡単なプログラムを読んでみましょう。
+点 $(x, y)$ の原点からのユーックリッド距離 $\sqrt{x^2 + y^2}$ を計算するプログラム ~dist.s~ です (図 [[fig:x86fp/dist.s]])。
+
+#+caption: x86fp/dist.s
+#+label: fig:x86fp/dist.s
+#+include: "code/x86fp/dist.s" src asm
+
+ここでは、
+点 (1.23, -4.56) の原点からのユークリッド距離を計算し、
+結果をラベル ~dist~ が指すアドレスに格納しています。
+
+このプログラムでは、
+以下のような考え方で $\sqrt{x^2 + y^2}$ を計算しています。
+
+1. スタックに $x$ の値をプッシュする
+2. スタックのトップの値を 2 乗し、スタックのトップに上書き
+3. スタックに $y$ の値をプッシュする
+4. スタックのトップの値を 2 乗し、スタックのトップに上書き
+5. スタックの 1 番目に、スタックのトップの値を加算
+6. スタックのトップの値を捨てる
+7. スタックのトップの値の平方根を計算し、スタックのトップに上書き
+8. スタックのトップの値をロードし、~dist~ 番地に書き込む
+9. スタックのトップの値を捨てる
+
+本書では x87 FPU 命令のそれぞれの動作は説明していません。
+IA-32 アーキテクチャの命令リファレンス \cite{Intel04:IA32J-2A,Intel04:IA32J-2B} を読みながら、
+各命令の動作を追い掛けてみてください。
+
+なお、
+アセンブリ言語でこんな苦労をしなくても、
+例えば、
+C 言語で以下のように書けば同じような計算ができます (図 [[fig:x86fp/dist-c.c]])。
+
+#+caption: x86fp/dist-c.c
+#+label: fig:x86fp/dist-c.c
+#+include: "code/x86fp/dist-c.c" src C
+
+C 言語で書いても、
+IA-32 アーキテクチャ向けのコンパイラでコンパイルすれば、
+最終的には x87 FPU の浮動小数点数命令を呼び出す機械語プログラムになります。
+アセンブリ言語で書いても、
+C 言語で書いても、
+どちらも最終的には x87 FPU を呼び出すという点では同じです。
+
+ただし、
+C 言語における ~sqrt~ は、
+C 言語の標準ライブラリに含まれる関数です。
+したがって、
+C 言語では平方根の計算には、
+関数 ~sqrt~ を呼び出す必要があります。
+関数呼び出しは、
+コンピュータにとってはそれほど「軽い」処理ではないため、
+C 言語で書く場合は、
+x87 FPU の能力を最大限引き出すのは簡単ではありません。
+
+#+begin_note
+[[sec:x86-64/reading]] 節で紹介するように、
+GCC のコンパイル時オプション (~-ffast-math~) を指定すれば、
+x87 FPU の FSQRT 命令を使用する機械語プログラムを生成することは可能です。
+#+end_note
+
+** 章末問題
+<<sec:x86fp/quiz>>
+
+# https://stackoverflow.com/questions/44957136/x87-fpu-computing-e-powered-x-maybe-with-a-taylor-series
+
+1. [[sec:x86fp/x87-model]] 節のプログラム ~add.c~ (図 [[fig:x86fp/add.c]]) に
+   よって生成されたプログラム ~add.s~ (図 [[fig:tr-regs/add.s]]) の分析法
+   を真似て、1.23 + 4.56 - 7.89 を計算するプログラムを C 言語で作成し、
+   GCC によってアセンブリ言語プログラムに変換せよ。GCC の最適化オプショ
+   ンを無効にするなど、1.23 + 4.56 - 7.89 を計算する x87 FPU 命令のコー
+   ドが生成されるように工夫せよ。生成されたアセンブリ言語プログラムを
+   読み、x87 FPU 命令がどのように使用されているかを分析せよ。
+
+   #+begin_answer
+   - プログラムの例: ~add3.c~ (図 [[fig:x86fp/ex/add3.c]])
+   - 生成されたアセンブリ言語プログラム (抜粋): ~add3.ss~ (図 [[fig:x86fp/ex/add3.ss]])
+   #+caption: x86fp/ex/add3.c
+   #+label: fig:x86fp/ex/add3.c
+   #+include: "code/x86fp/ex/add3.c" src C
+      
+   #+caption: x86fp/ex/add3.ss
+   #+label: fig:x86fp/ex/add3.ss
+   #+include: "code/x86fp/ex/add3.ss" src asm
+   #+end_answer
+
+2. (1.23 + 4.56) / 7.8 を計算するプログラムを C 言語で作成し、1. と同
+   じ分析を行え。
+
+   #+begin_answer
+   - プログラムの例: ~add-div.c~ (図 [[fig:x86fp/ex/add-div.c]])
+   - 生成されたアセンブリ言語プログラム (抜粋): ~add-div.ss~ (図 [[fig:x86fp/ex/add-div.ss]])
+   #+caption: x86fp/ex/add-div.c
+   #+label: fig:x86fp/ex/add-div.c
+   #+include: "code/x86fp/ex/add-div.c" src C
+   
+   #+caption: x86fp/ex/add-div.ss
+   #+label: fig:x86fp/ex/add-div.ss
+   #+include: "code/x86fp/ex/add-div.ss" src asm
+   #+end_answer
+   
+3. 7.89 / (1.23 + 4.56) を計算するプログラムを C 言語で作成し、
+   1. と同じ分析を行え。
+
+   #+begin_answer
+   - プログラムの例: ~div-add.c~ (図 [[fig:x86fp/ex/div-add.c]])
+   - 生成されたアセンブリ言語プログラム (抜粋): ~div-add.ss~ (図 [[fig:x86fp/ex/div-add.ss]])
+   #+caption: x86fp/ex/div-add.c
+   #+label: fig:x86fp/ex/div-add.c
+   #+include: "code/x86fp/ex/div-add.c" src C
+   
+   #+caption: x86fp/ex/div-add.ss
+   #+label: fig:x86fp/ex/div-add.ss
+   #+include: "code/x86fp/ex/div-add.ss" src asm
+   #+end_answer
+   
+4. (1.2 + 3.4) / (5.0 - 6.0) \times (7.0 - 8.9) を計算するプログラムを
+   C 言語で作成し、1. と同じ分析を行え。
+
+   #+begin_answer
+   - プログラムの例: ~div-mul.c~ (図 [[fig:x86fp/ex/div-mul.c]])
+   - 生成されたアセンブリ言語プログラム (抜粋): ~div-mul.ss~ (図 [[fig:x86fp/ex/div-mul.ss]])
+   #+caption: x86fp/ex/div-mul.c
+   #+label: fig:x86fp/ex/div-mul.c
+   #+include: "code/x86fp/ex/div-mul.c" src C
+   
+   #+caption: x86fp/ex/div-mul.ss
+   #+label: fig:x86fp/ex/div-mul.ss
+   #+include: "code/x86fp/ex/div-mul.ss" src asm
+   #+end_answer
+
+5. x87 FPU データレジスタのトップの値を 4 倍するアセンブリ言語プログラ
+   ムを示せ。
+
+   #+begin_answer
+   プログラムの例: ~quad.s~ (図 [[fig:x86fp/ex/quad.s]])
+   #+caption: x86fp/ex/quad.s
+   #+label: fig:x86fp/ex/quad.s
+   #+include: "code/x86fp/ex/quad.s" src asm
+   #+end_answer
