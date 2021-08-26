@@ -74,7 +74,7 @@ CPU が持つ潜在能力を最大限に引き出せるとともに、
 本書に掲載しているプログラムのソースコードや、
 本書の内容に関する関連情報や掲示板を用意しています。
 
-- https://github.com/h-ohsaki/asm
+- https://github.com/h-ohsaki/modern-asm
 
 最後に、
 本書の執筆に力を貸してくださったすべての方々に心から感謝いたします。
@@ -86,7 +86,7 @@ Enjoy!
 本書に掲載しているプログラムのソースコードは、
 以下のサポートサイトからダウンロードできます。
 
-- https://github.com/h-ohsaki/asm
+- https://github.com/h-ohsaki/modern-asm
 
 上記のページから、
 「リスト < リスト番号 > ファイル名」 (例: リスト 1.2 ~asm/add.s~) のように、
