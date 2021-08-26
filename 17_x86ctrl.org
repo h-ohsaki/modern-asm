@@ -1,0 +1,1090 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* x86 命令セット (実行制御)
+<<ch:x86ctrl>>
+
+本章では、
+IA-32 アーキテクチャの実行制御に関する命令の中でも、
+特に重要度が高いものを説明します。
+
+** プログラムの実行制御
+<<sec:x86ctrl/overview>>
+
+[[sec:cpu/structure]] 節で説明したように、
+IA-32 アーキテクチャは、
+フォン・ノイマン・アーキテクチャの一種です。
+フォン・ノイマン・アーキテクチャは、
+「プログラム内蔵型コンピュータ」であり、
+メモリに格納されているプログラム (機械語で書かれた命令の列) を 1 語ずつ読み込み、
+読み込んだ命令を順番に実行します。
+
+次に読み込む命令が格納されているアドレスを表すレジスタが「プログラムカウンタ」でした。
+プログラムカウンタの値は、
+基本的には CPU の制御装置によって自動的に更新されます。
+[[ch:x86regs]] 章で説明したように、
+IA-32 アーキテクチャにおいて、
+プログラムカウンタは EIP レジスタと呼ばれています。
+
+プログラムカウンタ (IA-32 アーキテクチャでは EIP レジスタ) の値を変更すれば、
+CPU が次に実行する命令を読み込むアドレスを変更できます。
+つまり、
+プログラムカウンタの値を変更すれば、
+メモリに格納されているプログラムの、
+どの部分を実行すればよいかを CPU に指示できます。
+別の言い方をすれば、
+プログラムカウンタの値を変更すれば、
+CPU が実行するプログラムの実行を制御することができます。
+
+一般に、
+プログラムカウンタの値を変更して、
+CPU が次に実行する命令を読み込むアドレスを変更することを *ジャンプ (jump)* と呼びます。
+プログラムカウンタの値が、
+現在の値から、
+「ポーン」と新しい値に飛ぶ (jump する) ことからこう呼ばれています。
+
+また、
+プログラムの実行制御には、
+ジャンプだけではなく、
+[[sec:stack/funcall]] 節で説明したような関数呼び出しもあります。
+関数呼び出しは、
+本質的には、
+スタックにリターンアドレスをプッシュして、
+サブルーチンの開始アドレスにジャンプするだけです。
+ただし、
+単なるジャンプと関数呼び出しを区別するために、
+関数呼び出しは *コール (call; 呼び出す)*、
+関数から呼び出し元のプログラムに制御を戻すことを *リターン (return; 戻る)* と呼びます。
+
+なお、
+IA-32 アーキテクチャでは、
+プログラムの実行を制御すること (ジャンプ、
+コール、
+リターンの 3 パターン) を *制御転送 (control transfer)* と呼んでいます。
+プログラムカウンタの値を書き換えて、
+CPU の制御をあるアドレスに転送する (trnasfer) という意味で名付けられているのだと考えられます。
+
+** 制御転送命令
+<<sec:x86ctrl/transfer>>
+
+[[ch:x86regs]] 章で説明したように、
+IA-32 アーキテクチャにおける汎用命令のうち、
+プログラムの実行制御に関する命令は以下のように分類されます。
+
+- 制御転送命令
+   - 無条件転送命令 ★
+   - 条件付き転送命令 ★
+   - ソフトウェア割り込み命令
+
+制御転送命令は以下の 31 種類です (文献 \cite{Intel04:IA32J-1} より抜粋)。
+
+#+attr_latex: :environment longtable :align lp{35zw} :float t
+| JMP    | Jump                                                                              |
+|        | ジャンプ                                                                          |
+| JE     | /JZ Jump if equal/Jump if zero                                                    |
+|        | 等しい場合はジャンプ/ ゼロの場合はジャンプ                                        |
+| JNE    | /JNZ Jump if not equal/Jump if not zero                                           |
+|        | 等しくない場合はジャンプ/ ゼロでない場合はジャンプ                                |
+| JA     | /JNBE Jump if above/Jump if not below or equal                                    |
+|        | より大きい場合はジャンプ/ より小さくなく等しくない場合はジャンプ                  |
+| JAE    | /JNB Jump if above or equal/Jump if not below                                     |
+|        | より大きいか等しい場合はジャンプ/ より小さくない場合はジャンプ                    |
+| JB     | /JNAE Jump if below/Jump if not above or equal                                    |
+|        | より小さい場合はジャンプ/ より大きくなく等しくない場合はジャンプ                  |
+| JBE    | /JNA Jump if below or equal/Jump if not above                                     |
+|        | より小さいか等しい場合はジャンプ/ より大きくない場合はジャンプ                    |
+| JG     | /JNLE Jump if greater/Jump if not less or equal                                   |
+|        | より大きい場合はジャンプ/ より小さくなく等しくない場合はジャンプ                  |
+| JGE    | /JNL Jump if greater or equal/Jump if not less                                    |
+|        | より大きいか等しい場合はジャンプ/ より小さくない場合はジャンプ                    |
+| JL     | /JNGE Jump if less/Jump if not greater or equal                                   |
+|        | より小さい場合はジャンプ/ より大きくなく等しくない場合はジャンプ                  |
+| JLE    | /JNG Jump if less or equal/Jump if not greater                                    |
+|        | より小さいか等しい場合はジャンプ/ より大きくない場合はジャンプ                    |
+| JC     | Jump if carry                                                                     |
+|        | キャリーありの場合はジャンプ                                                      |
+| JNC    | Jump if not carry                                                                 |
+|        | キャリーなしの場合はジャンプ                                                      |
+| JO     | Jump if overflow                                                                  |
+|        | オーバーフローありの場合はジャンプ                                                |
+| JNO    | Jump if not overflow                                                              |
+|        | オーバーフローなしの場合はジャンプ                                                |
+| JS     | Jump if sign（negative）                                                          |
+|        | 符号付きの場合（負の場合）はジャンプ                                              |
+| JNS    | Jump if not sign（non-negative）                                                  |
+|        | 符号なしの場合（負でない場合）はジャンプ                                          |
+| JPO    | /JNP Jump if parity odd/Jump if not parity                                        |
+|        | 奇数パリティの場合はジャンプ/ パリティなしの場合はジャンプ                        |
+| JPE    | /JP Jump if parity even/Jump if parity                                            |
+|        | 偶数パリティの場合はジャンプ/ パリティありの場合はジャンプ                        |
+| JCXZ   | /JECXZ Jump register CX zero/Jump register ECX zero                               |
+|        | CX レジスタがゼロの場合はジャンプ/ECX レジスタがゼロの場合はジャンプ              |
+| LOOP   | Loop with ECX counter                                                             |
+|        | ECX をカウンタとしてループ                                                        |
+| LOOPZ  | /LOOPE Loop with ECX and zero/Loop with ECX and equal                             |
+|        | ECX をカウンタに、ゼロの場合はループ/ECX をカウンタに、等しい場合はループ         |
+| LOOPNZ | /LOOPNE Loop with ECX and not zero/Loop with ECX and not equal                    |
+|        | ECX をカウンタに、ゼロでない場合はループ/ECX をカウンタに、等しくない場合はループ |
+| CALL   | Call procedure                                                                    |
+|        | プロシージャの呼び出し                                                            |
+| RET    | Return                                                                            |
+|        | 戻る                                                                              |
+| IRET   | Return from interrupt                                                             |
+|        | 割り込みから戻る                                                                  |
+| INT    | Software interrupt                                                                |
+|        | ソフトウェア割り込み                                                              |
+| INTO   | Interrupt on overflow                                                             |
+|        | オーバーフローで割り込み                                                          |
+| BOUND  | Detect value out of range                                                         |
+|        | 範囲外の値を検出                                                                  |
+| ENTER  | High-level procedure entry                                                        |
+|        | 高度なプロシージャの開始                                                          |
+| LEAVE  | High-level procedure exit                                                         |
+|        | 高度なプロシージャの終了                                                          |
+
+以下では、上の分類で★印を付けた、
+特に重要な命令を説明します。
+
+*** 無条件転送命令: JUMP (Jump)
+
+*JMP --- Jump* [3-411]
+
+JMP 命令は 1 つのオペランドを取り、
+指定されたオペランドのアドレスにジャンプします。
+オペランドには即値、
+レジスタ、
+メモリロケーションを指定できます。
+
+JMP 命令の動作を CPU の抽象モデルで記述すると以下のようになります。
+ここで \pc はプログラムカウンタを意味します。
+
+- 即値 $c$ だけ後のアドレス (*相対アドレス (relative address)*) にジャ
+  ンプする
+  #+begin_quote
+  \pc ← <+> $c$
+  #+end_quote
+
+  #+begin_note
+  \pc の値は、
+  現在実行しようとしている JMP 命令が格納されているアドレスではなく、
+  JMP 命令の次の命令が格納されているアドレスを差します。
+  #+end_note
+
+- レジスタ \r{i} の値のアドレスにジャンプする
+  #+begin_quote
+  \pc ← \r{i}
+  #+end_quote
+
+- メモリ $m$ に格納されているアドレスにジャンプする
+  #+begin_quote
+  \pc ← [$m$]
+  #+end_quote
+
+相対アドレスとは、
+現在のプログラムカウンタの値を基準として、
+どれだけプラスもしくはマイナスの方向にジャンプするかを表す *オフセット (offset)* です。
+即値 $c$ が正の値なら、
+現在のプログラムカウンタよりも大きい (先の) アドレスにジャンプします。
+即値 $c$ が負の値なら、
+現在のプログラムカウンタよりも小さい (前の) アドレスにジャンプします。
+
+JMP 命令を実行しても、
+ステータスフラグレジスタの値は変化しません。
+つまり、
+JMP 命令を実行する直前のステータスフラグの値は保存されます。
+
+JMP 命令によるジャンプは、
+レジスタの 1 つであるプログラムカウンタの値を変更しているだけです。
+このため、
+例えば 0x8000 0000 番地へのジャンプは
+#+begin_src asm
+	movl	$0x80000000, %eax
+	jmp	*%eax
+#+end_src
+のように書くことができます。
+
+ところで、
+このプログラムは、
+データ転送のための MOV 命令を使って、
+#+begin_src asm
+	movl	$0x80000000, %eax
+	movl	%eax, %eip	# 書けない
+#+end_src
+のように書いてもよさそうな気がします。
+ある意味そのとおりです。
+
+汎用レジスタも、
+プログラムカウンタも、
+CPU の内部にあるレジスタ (少量で高速なメモリ) であり、
+CPU にとってはどちらも同じようなものだといえます。
+そのため、
+MOV 命令ではプログラムカウンタの値を変更できるようにしてもよかったかのもしれませんが、
+IA-32 アーキテクチャでは、
+MOV 命令の宛先オペランドにプログラムカウンタを指定することはできず、
+そのため EIP レジスタの値を直接変更することはできません。
+
+#+begin_note
+IA-32 アーキテクチャは 8 個の汎用レジスタを持っています。
+8 種類のレジスタを表現するためには ($2^3$ = 8 であるため) 3 ビットが必要です。
+
+IA-32 アーキテクチャの各命令で、
+レジスタをオペランドに指定できる場合は、
+オペコードの一部か、
+もしくは ModR/M バイトの一部に、
+どの汎用レジスタなのかを指定する 3 ビットが埋め込まれています。
+
+このため、
+EIP レジスタを、
+MOV 命令や ADD 命令などのオペランドに指定できるようにするためには
+1. レジスタの指定に 4 ビットを使用する (レジスタの種類が 8 を超えると3
+   ビットでは足りないため)
+2. レジスタの指定は 3 ビットのままとする。ただし、汎用レジスタのどれか
+   を外して、代わりに EIP レジスタ を 8 種類のレジスタに含める
+のどちらかが必要になります。
+
+ただし、1. は命令語が長くなってしまうので望ましくありません。
+また、2. も、
+EIP レジスタよりも重要性の低いレジスタがないためよい方法ではありません。
+あえて外すとすれば ESP レジスタでしょうが、
+EIP レジスタと ESP レジスタのどちらが重要かと考えれば、
+それはやはりスタックポインタである ESP レジスタでしょう。
+#+end_note
+
+以下は、
+JMP 命令のオペコード表です (文献 \cite{Intel04:IA32J-2A} より抜粋)。
+
+| オペコード | 命令         | 説明                                                     |
+|------------+--------------+----------------------------------------------------------|
+| EB cb      | JMP rel8     | 次の命令との相対分量分だけ相対 short ジャンプする。      |
+| E9 cw      | JMP rel16    | 次の命令との相対分量分だけ相対 near ジャンプする。       |
+| E9 cd      | JMP rel32    | 次の命令との相対分量分だけ相対 near ジャンプする。       |
+| FF /4      | JMP r/m16    | r/m16 で指定されるアドレスに絶対間接 near ジャンプする。 |
+| FF /4      | JMP r/m32    | r/m32 で指定されるアドレスに絶対間接 near ジャンプする。 |
+| EA cd      | JMP ptr16:16 | オペランドで指定されるアドレスに絶対 far ジャンプする。  |
+| EA cp      | JMP ptr16:32 | オペランドで指定されるアドレスに絶対 far ジャンプする。  |
+| FF /5      | JMP m16:16   | m16:16 で指定されるアドレスに絶対間接 far ジャンプする。 |
+| FF /5      | JMP m16:32   | m16:32 で指定されるアドレスに絶対間接 far ジャンプする。 |
+
+#+begin_note
+上の表で、
+「far ジャンプ」というのはメモリセグメントをまたがったジャンプです。
+GNU/Linux 上で動作する普通のプログラムでは、
+同じセグメント内での「short ジャンプ」や「near ジャンプ」になります。
+#+end_note
+
+続いて、
+JMP 命令のサンプルプログラムです (図 [[fig:x86trans/jmp.lst]])。
+
+#+caption: x86trans/jmp.lst
+#+label: fig:x86trans/jmp.lst
+#+include: "code/x86trans/jmp.lst" src asm
+
+GAS によるアセンブル結果は、
+=ld= コマンドによってリンクされる前の状態なので、
+.text セクションのアドレスが 0 から始まっています。
+また、
+この段階では、
+=L2= や =val_l= などのシンボルの値が確定していないため、
+オブジェクトコード中で対応する値はすべてゼロになっています (=ld= コマンドによってリンクした時点で正しいアドレスが埋められます ([[sec:gas/binutils]] 節))。
+
+筆者の環境では、
+=ld= コマンドによってリンクし、
+実行ファイルになった状態で、
+=L1=、
+=L2=、
+=L3= のアドレスは、
+それぞれ 0x0804 9004、
+0x0804 900d、
+0x0804 9015 に配置されていました。
+上のプログラムのコメント中には、
+リンク後のラベルのアドレスを記入しています。
+
+GAS のアセンブル結果を見るだけでなく、
+最終的に、
+リンカによってどのような実行ファイルになるのかを見てみましょう。
+=objdump= コマンドを使って、
+実行ファイルを逆アセンブルしてみます。
+
+#+begin_src sh
+$ as -g -o jmp.o jmp.s
+$ ld -o jmp jmp.o
+$ objdump -d jmp
+jmp:     file format elf32-i386
+
+Disassembly of section .text:
+
+08049000 <_start>:
+ 8049000:	eb 02                	jmp    8049004 <L1>
+ 8049002:	90                   	nop
+ 8049003:	90                   	nop
+
+08049004 <L1>:
+ 8049004:	b8 0d 90 04 08       	mov    $0x804900d,%eax
+ 8049009:	ff e0                	jmp    *%eax
+ 804900b:	90                   	nop
+ 804900c:	90                   	nop
+
+0804900d <L2>:
+ 804900d:	ff 25 00 a0 04 08    	jmp    *0x804a000
+ 8049013:	90                   	nop
+ 8049014:	90                   	nop
+
+08049015 <L3>:
+ 8049015:	b8 01 00 00 00       	mov    $0x1,%eax
+ 804901a:	cd 80                	int    $0x80
+#+end_src
+
+ここでは 3 つの JMP 命令があります。
+まず、
+#+begin_src raw
+ 8049000:	eb 02                	jmp    8049004 <L1>
+#+end_src
+はオフセットが +2 (バイト) の相対ジャンプ命令になっていることがわかります。
+次の、
+#+begin_src raw
+ 8049009:	ff e0                	jmp    *%eax
+#+end_src
+は、
+レジスタ EAX に格納されている絶対アドレスへのジャンプです。
+最後の
+#+begin_src raw
+ 804900d:	ff 25 00 a0 04 08    	jmp    *0x804a000
+#+end_src
+は即値として指定されたアドレス 0x804 a000 に格納されている番地へのジャンプになっていることがわかります。
+
+#+begin_note
+上のプログラム中の NOP 命令は、
+「何もしない」命令であり、
+命令語長は 1 バイトで、
+オペコードは 0x90 です。
+CPU は NOP 命令を単に読み飛ばします (NOP 命令があればプログラムカウンタを +1 します)。
+
+NOP 命令は、
+バイナリファイルを書き換えて、
+特定の命令を無効にするときによく使われます。
+例えば、
+#+begin_src asm
+	mov    $0x804900d,%eax
+#+end_src
+という命令は、
+機械語では
+#+begin_src raw
+0xb8 0x0d 0x90 0x04 0x08
+#+end_src
+の 5 バイトになります。
+機械語のプログラム中で、
+上記の命令を無効化したければ、
+これらの 5 バイトをすべて
+#+begin_src raw
+0x90 0x90 0x90 0x90 0x90
+#+end_src
+で上書きします。
+こうするとプログラム中の周囲の命令に影響を与えることなく、
+ある特定の命令だけを無効化できます。
+#+end_note
+
+*** サブルーチンの呼び出し: CALL (Call)
+
+*CALL --- Call Procedure* [3-67]
+
+CALL 命令はサブルーチン呼び出しを行います。
+CALL 命令は、
+その動作も、
+指定できるオペランドも JMP 命令とそっくりです。
+JMP 命令と同じようにオペランドを 1 つだけ取ります。
+JMP 命令と同じように、
+オペランドには、
+レジスタ、
+即値、
+メモリロケーションを指定できます。
+
+CALL 命令と JMP 命令の大きな違いは、
+JMP 命令は EIP レジスタの値を変更するだけですが、
+CALL 命令はリターンアドレスをスタックにプッシュした後で EIP レジスタの値を変更します ([[sec:stack/funcall]] 節)。
+
+#+begin_note
+CALL 命令は、
+メモリのセグメントモードや CPU の動作モードによって命令の動作がそれぞれ異なります。
+ただし、
+GNU/Linux のユーザ空間で動作するプログラムであれば、
+こういった細かな挙動は気にする必要はありません。
+#+end_note
+
+CALL 命令の動作を CPU の抽象モデルで記述すると以下のようになります。
+ここで \pc はプログラムカウンタ、
+\sp はスタックポインタを意味します。
+
+- 即値 $c$ だけ後のアドレス (相対アドレス) をコールする
+  #+begin_quote
+  \sp ← <-> 4 \\
+  \relax [\sp] ← \pc \\
+  \pc ← <+> $c$
+  #+end_quote
+  IA-32 アーキテクチャではアドレスは 32 ビット (4 バイト) なので、
+  スタックポインタの値を 4 だけ減少します。
+
+- レジスタ \r{i} の値のアドレスをコールする
+  #+begin_quote
+  \sp ← <-> 4 \\
+  \relax [\sp] ← \pc \\
+  \pc ← \r{i}
+  #+end_quote
+
+- メモリ $m$ に格納されているアドレスをコールする
+  #+begin_quote
+  \sp ← <-> 4 \\
+  \relax [\sp] ← \pc \\
+  \pc ← [$m$]
+  #+end_quote
+
+CALL 命令のオペコード表です (文献 \cite{Intel04:IA32J-2A} より抜粋)。
+JMP 命令のオペコード表とそっくりであることがわかります。
+
+| オペコード | 命令          | 説明                                                   |
+|------------+---------------+--------------------------------------------------------|
+| E8 cw      | CALL rel16    | 相対 near コール、次の命令とディスプレースメント相対。 |
+| E8 cd      | CALL rel32    | 相対 near コール、次の命令とディスプレースメント相対。 |
+| FF /2      | CALL r/m16    | 絶対間接 near コール、r/m16 でアドレスを指定。         |
+| FF /2      | CALL r/m32    | 絶対間接 near コール、r/m32 でアドレスを指定。         |
+| 9A cd      | CALL ptr16:16 | 絶対 far コール、オペランドでアドレスを指定。          |
+| 9A cp      | CALL ptr16:32 | 絶対 far コール、オペランドでアドレスを指定。          |
+| FF /3      | CALL m16:16   | 絶対間接 far コール、m16:16 でアドレスを指定。         |
+| FF /3      | CALL m16:32   | 絶対間接 far コール、m16:32 でアドレスを指定。         |
+
+CALL 命令のサンプルプログラムです (図 [[fig:x86trans/call.lst]])。
+
+#+caption: x86trans/call.lst
+#+label: fig:x86trans/call.lst
+#+include: "code/x86trans/call.lst" src asm
+
+*** サブルーチンから戻る: RET (Return)
+
+*RET --- Return from Procedure* [4-179]
+
+RET 命令は、
+CALL 命令で呼び出したサブルーチンから、
+呼び出し元のプログラムに戻るために使用される命令です。
+
+通常、
+RET 命令はオペランドを取りません。
+ただし、
+IA-32 アーキテクチャの RET 命令では、
+オペランドとして即値を指定することもできます。
+オペランドに即値を指定した場合は、
+リターンした直後に、
+スタックから指定されたバイト数だけポップします (ポップしたデータは捨てられます)。
+
+これは、
+関数呼び出しにおいて、
+関数への引数をスタックに積んでコールした場合に、
+不要となったスタック上の引数を捨てるために使用されます。
+
+CALL 命令の動作を CPU の抽象モデルで記述すると以下のようになります。
+ここで \pc はプログラムカウンタ、
+\sp はスタックポインタを意味します。
+
+- 呼び出し元にリターンする
+  #+begin_quote
+  \pc ← [\sp] \\
+  \sp ← <+> 4
+  #+end_quote
+
+- 呼び出し元にリターンし、スタックから $c$ バイト捨てる
+  #+begin_quote
+  \pc ← [\sp] \\
+  \sp ← <+> (4 + $c$)
+  #+end_quote
+
+RET 命令のオペコード表です (文献 \cite{Intel04:IA32J-2B} より抜粋)。
+
+#+attr_latex: :environment maxtabular
+| オペコード | 命令      | 説明                                                                           |
+|------------+-----------+--------------------------------------------------------------------------------|
+| C3         | RET       | コール元プロシージャに near リターンする。                                     |
+| CB         | RET       | コール元プロシージャに far リターンする。                                      |
+| C2 iw      | RET imm16 | コール元プロシージャに near リターンし、imm16 バイトをスタックからポップする。 |
+| CA iw      | RET imm16 | コール元プロシージャに far リターンし、imm16 バイトをスタックからポップする。  |
+
+#+caption: x86trans/ret.lst
+#+label: fig:x86trans/ret.lst
+#+include: "code/x86trans/ret.lst" src asm
+
+*** 条件付き転送命令: Jcc
+
+*Jcc --- Jump if Condition Is Met* [3-407]
+
+JMP 命令は、
+有無を言わさず、
+オペランドで指定されたアドレスにジャンプする命令でした。
+
+*条件分岐 (conditional branch)* がない単純なプログラムなら JMP 命令だけでも書けますが、
+普通のプログラムには条件分岐が不可欠です。
+C 言語では、
+if 文や switch 文などを用いて条件分岐が記述できます。
+例えば、
+C 言語の if 文に相当するプログラムを書こうと思うと、
+以下で紹介する条件付きジャンプ命令が必要になります。
+
+#+begin_note
+技術的には、
+CMOVE (conditional move) 命令など、
+他の命令を使っても条件分岐を記述できないことはありませんが、
+普通は条件付きジャンプ命令を使います。
+#+end_note
+
+IA-32 アーキテクチャには、
+以下のような 32 個の *条件付きジャンプ (conditional jump)* 命令があります。
+#+begin_quote
+JA JAE JB JBE JC JCXZ JE JECXZ JG JGE JL JLE JNA JNAE JNB JNBE JNC JNE
+JNG JNGE JNL JNLE JNO JNP JNS JNZ JO JP JPE JPO JS JZ
+#+end_quote
+
+条件付きジャンプ命令だけで 32 個もあってゲンナリしますが、
+条件分岐する / しないを判定する条件が違っているだけです。
+条件分岐の条件ごとに、
+それぞれ別の命令が用意されています。
+
+これらの「J なんとか」という名前の条件付きジャンプ命令を総称して、
+*Jcc 命令 (cc は condition code (条件コード))* と呼びます。
+
+代表的な Jcc 命令の条件とのその意味を表 [[tab:x86ctrl/jcc]] に示します。
+
+#+caption: 符号なし条件ジャンプ命令
+#+label: tab:x86ctrl/jcc
+| cc      | 意味                            | 条件            |
+|---------+---------------------------------+-----------------|
+| A / NBE | より上 / より下でなく等しくない | (CF or ZF) == 0 |
+| AE / NB | より上か等しい / より下でない   | CF == 0         |
+| B / NAE | より下 / より上でなく等しくない | CF == 1         |
+| BE / NA | より下か等しい/より上でない     | (CF or ZF) == 1 |
+| C       | キャリーがある                  | CF == 1         |
+| E / Z   | 等しい / ゼロ                   | ZF == 1         |
+| NC      | キャリーがない                  | CF == 0         |
+| NE / NZ | 等しくない / ゼロでない         | ZF == 0         |
+| NP / PO | パリティがない / パリティが奇数 | PF == 0         |
+| P / PE  | パリティがある / パリティが偶数 | PF == 1         |
+
+#+begin_note
+ここでは、
+EFLAGS 中のステータスフラグの値を条件とする、
+符号なし条件ジャンプ命令のみを紹介しています。
+IA-32 アーキテクチャには、
+- レジスタ CX やレジスタ ECX の値を条件とする、符号なし条件ジャンプ命令
+- 符号付き条件ジャンプ命令
+なども存在します。
+詳しくはこのあとのオペコード表や文献 \cite{Intel04:IA32J-1} を参照してください。
+#+end_note
+
+この表は、
+左から順に、
+cc の名称、
+その意味、
+cc の条件 (どのような条件のときにジャンプするか) を表しています。
+
+Jcc は、
+(基本的に) EFLAGS 中のステータスフラグが、
+ある (cc で指定される) 条件を満たしていれば、
+オペランドで指定されたアドレスにジャンプします。
+条件を満たしていなければ何もしません。
+なお、
+条件ジャンプ命令のオペランドには、
+相対アドレス (relative address) しか指定できません。
+
+例えば、
+JC 命令は cc の部分が「C」です。
+上の表より、
+JC 命令は「キャリーがある」場合にジャンプすること、
+その条件は「CF フラグが 1 (CF == 1)」であることがわかります。
+
+A / NBE のように併記されている条件は、
+名前は違いますが実際には同じ条件です。
+例えば、
+JA 命令は「(値が) より上ならジャンプする」という意味の命令であり、
+JNBE 命令は「(値が) より下でなく等しくもないならジャンプする」という意味の命令です。
+どちらも (論理的には) 同じ意味の命令であり、
+どちらも同じオペコードの機械語に変換されます。
+
+このあたり、
+少しややこしいので補足します。
+
+ある命題 $P$ があり、
+命題 $P$ の否定を $\overline{P}$ と表記します。
+まず、
+命題 $P$ の「否定の否定」は命題 $P$ と等しくなります。
+\begin{align}
+  P = \overline{\overline{P}}
+\end{align}
+例えば、
+ある命題 $P$ を
+\begin{align}
+  P: 今日は晴れだった
+\end{align}
+とすると、
+$P$ の否定は
+\begin{align}
+  \overline{P}: 今日は晴れではなかった
+\end{align}
+となります。
+さらに、
+$\overline{P}$ の否定は
+\begin{align}
+  \overline{\overline{P}}: 「今日は晴れではなかった」のではなかった = 今日は晴れだった
+\end{align}
+となります。
+
+したがって、
+\begin{align}
+  P: x は y より上である
+\end{align}
+の否定は
+\begin{align}
+  \overline{P}: x は y より上ではない
+\end{align}
+となります。
+これはさらに
+\begin{align}
+  \overline{P}: 「x と y が等しい」か、または「x は y より下である」
+\end{align}
+と等価です。
+再度 $\overline{P}$ の否定を考えると、
+\begin{align}
+  \overline{\overline{P}}: 「『x と y が等しい』か、または『x は y より下である』」ではない \\
+  = x と y が等しくなく、また、x が y より下でもない
+\end{align}
+となります。
+
+これより、
+さきほどの条件 A 「より上である」と条件 NBE 「より下でなく等しくもない」が論理的には同じであることがわかります。
+
+さて、
+Jcc の動作を CPU の抽象モデルで記述すると以下のようになります。
+
+- 条件 $cc$ が満たされていれば、定数 $c$ だけあとのアドレス (相対アド
+  レス) にジャンプする
+  #+begin_quote
+　\pc ← <+> $c$ if $cc$ が成り立っている
+  #+end_quote
+
+Jcc 命令を実行しても、
+EFLAGS の中のステータスフラグの値は変化しません。
+つまり、
+Jcc 命令を実行する直前のステータスフラグの値は保存されます。
+
+条件付きジャンプ命令を実行する前に、
+EFLAGS 中のステータスフラグの値を設定しておかなければなりません。
+このため、
+条件付きジャンプ命令を使う場合は
+1. データ転送命令や算術・論理演算命令などを実行してステータスフラグを
+   変化させておく
+2. 条件付きジャンプ命令 Jcc によって、ある条件 cc を満たしていればジャ
+   ンプする
+という使い方になります。
+
+典型的な利用例を示しましょう。
+#+begin_src asm
+        cmpl	$123, %eax
+        je      L2
+L1:
+        #レジスタ EAX の値が 123 と「等しくない」場合の処理
+	:
+	:
+        jmp     L3
+L2:
+        #レジスタ EAX の値が 123 と「等しい」場合の処理
+	:
+	:
+L3:
+        # それ以降の共通の処理
+#+end_src
+まず、
+CMP 命令によって「レジスタ EAX の値 - 123」を計算し、
+ステータスフラグの値を更新します (CMP 命令の動作については [[sec:x86arith/arithmetic]] 節を参照してください)。
+
+レジスタ EAX の値が 123 と等しければ、
+CMP 命令によって ZF フラグが 1 になります。
+JE 命令によって、
+ZF フラグが 1 であれば =L2= 番地にジャンプします。
+ジャンプした先の =L2= 番地で、
+「レジスタ EAX が 123 と等しい場合」に行いたい処理を実行します。
+
+レジスタ EAX の値が 123 と等しくなければ、
+CMP 命令によって ZF フラグが 0 になります。
+この場合、
+JE 命令によって =L2= にジャンプすることなく、
+そのまま次の =L1= 番地に進みます。
+=L1= 番地で、
+「レジスタ EAX が 123 と等しくない場合」に行いたい処理を実行します。
+
+Jcc 命令のオペコード表です (文献 \cite{Intel04:IA32J-2A} より抜粋)。
+
+#+attr_latex: :environment longtable :align llp{25zw} :float t
+| オペコード  | 命令          | 説明                                                                 |
+|-------------+---------------+----------------------------------------------------------------------|
+| 77 cb       | JA rel8       | より上(CF=0 および ZF=0)の場合 short ジャンプする。                  |
+| 73 cb       | JAE rel8      | より上か等しい(CF=0)場合 short ジャンプする。                        |
+| 72 cb       | JB rel8       | より下(CF=1)の場合 short ジャンプする。                              |
+| 76 cb       | JBE rel8      | より下か等しい(CF=1 または ZF=1)場合 short ジャンプする。            |
+| 72 cb       | JC rel8       | キャリーがある(CF=1)場合 short ジャンプする。                        |
+| E3 cb       | JCXZ rel8     | CX レジスタが 0 の場合 short ジャンプする。                          |
+| E3 cb       | JECXZ rel8    | ECX レジスタが 0 の場合 short ジャンプする。                         |
+| 74 cb       | JE rel8       | 等しい(ZF=1)場合 short ジャンプする。                                |
+| 7F cb       | JG rel8       | より大きい(ZF=0 および SF=OF)場合 short ジャンプする。               |
+| 7D cb       | JGE rel8      | より大きいか等しい(SF=OF)場合 short ジャンプする。                   |
+| 7C cb       | JL rel8       | より小さい(SF<>OF)場合 short ジャンプする。                          |
+| 7E cb       | JLE rel8      | より小さいか等しい(ZF=1 または SF<>OF)場合 short ジャンプする。      |
+| 76 cb       | JNA rel8      | より上でない(CF=1 または ZF=1)場合 short ジャンプする。              |
+| 72 cb       | JNAE rel8     | より上でなく等しくない(CF=1)場合 short ジャンプする。                |
+| 73 cb       | JNB rel8      | より下でない(CF=0)場合 short ジャンプする。                          |
+| 77 cb       | JNBE rel8     | より下でなく等しくない(CF=0およびZF=0)場合shortジャンプする。        |
+| 73 cb       | JNC rel8      | キャリーがない(CF=0)場合 short ジャンプする。                        |
+| 75 cb       | JNE rel8      | 等しくない(ZF=0)場合 short ジャンプする。                            |
+| 7E cb       | JNG rel8      | より大きくない(ZF=1 または SF<>OF)場合 short ジャンプする。          |
+| 7C cb       | JNGE rel8     | より大きくなく等しくない(SF<>OF)場合 short ジャンプする。            |
+| 7D cb       | JNL rel8      | より小さくない(SF=OF)場合 short ジャンプする。                       |
+| 7F cb       | JNLE rel8     | より小さくなく等しくない(ZF=0 および SF=OF)場合 short ジャンプする。 |
+| 71 cb       | JNO rel8      | オーバーフローがない(OF=0)場合 short ジャンプする。                  |
+| 7B cb       | JNP rel8      | パリティがない(PF=0)場合 short ジャンプする。                        |
+| 79 cb       | JNS rel8      | 符号がない(SF=0)場合 short ジャンプする。                            |
+| 75 cb       | JNZ rel8      | ゼロでない(ZF=0)場合 short ジャンプする。                            |
+| 70 cb       | JO rel8       | オーバーフローがある(OF=1)場合 short ジャンプする。                  |
+| 7A cb       | JP rel8       | パリティがある(PF=1)場合 short ジャンプする。                        |
+| 7A cb       | JPE rel8      | パリティが偶数(PF=1)の場合 short ジャンプする。                      |
+| 7B cb       | JPO rel8      | パリティが奇数(PF=0)の場合 short ジャンプする。                      |
+| 78 cb       | JS rel8       | 符号がある(SF=1)場合 short ジャンプする。                            |
+| 74 cb       | JZ rel8       | ゼロ(ZF=1)の場合 short ジャンプする。                                |
+| 0F 87 cw/cd | JA rel16/32   | より上(CF=0 および ZF=0)の場合 near ジャンプ。                       |
+| 0F 83 cw/cd | JAE rel16/32  | より上か等しい(CF=0)場合 near ジャンプする。                         |
+| 0F 82 cw/cd | JB rel16/32   | より下(CF=1)の場合 near ジャンプする。                               |
+| 0F 86 cw/cd | JBE rel16/32  | より下か等しい(CF=1 または ZF=1)場合 near ジャンプする。             |
+| 0F 82 cw/cd | JC rel16/32   | キャリーがある(CF=1)場合 near ジャンプする。                         |
+| 0F 84 cw/cd | JE rel16/32   | 等しい(ZF=1)場合 near ジャンプする。                                 |
+| 0F 84 cw/cd | JZ rel16/32   | ゼロ(ZF=1)の場合 near ジャンプする。                                 |
+| 0F 8F cw/cd | JG rel16/32   | より大きい(ZF=0 および SF=OF)場合 near ジャンプする。                |
+| 0F 8D cw/cd | JGE rel16/32  | より大きいか等しい(SF=OF)場合 near ジャンプする。                    |
+| 0F 8C cw/cd | JL rel16/32   | より小さい(SF<>OF)場合 near ジャンプする。                           |
+| 0F 8E cw/cd | JLE rel16/32  | より小さいか等しい(ZF=1 または SF<>OF)場合 near ジャンプする。       |
+| 0F 86 cw/cd | JNA rel16/32  | より上でない(CF=1 または ZF=1)場合 near ジャンプする。               |
+| 0F 82 cw/cd | JNAE rel16/32 | より上でなく等しくない(CF=1)場合 near ジャンプする。                 |
+| 0F 83 cw/cd | JNB rel16/32  | より下でない(CF=0)場合 near ジャンプする。                           |
+| 0F 87 cw/cd | JNBE rel16/32 | より下でなく等しくない(CF=0およびZF=0)場合nearジャンプする。         |
+| 0F 83 cw/cd | JNC rel16/32  | キャリーがない(CF=0)場合 near ジャンプする。                         |
+| 0F 85 cw/cd | JNE rel16/32  | 等しくない(ZF=0)場合 near ジャンプする。                             |
+| 0F 8E cw/cd | JNG rel16/32  | より大きくない(ZF=1 または SF<>OF)場合 near ジャンプする。           |
+| 0F 8C cw/cd | JNGE rel16/32 | より大きくなく等しくない(SF<>OF)場合 near ジャンプする。             |
+| 0F 8D cw/cd | JNL rel16/32  | より小さくない(SF=OF)場合 near ジャンプする。                        |
+| 0F 8F cw/cd | JNLE rel16/32 | より小さくなく等しくない(ZF=0 および SF=OF)場合 near ジャンプする。  |
+| 0F 81 cw/cd | JNO rel16/32  | オーバーフローがない(OF=0)場合 near ジャンプする。                   |
+| 0F 8B cw/cd | JNP rel16/32  | パリティがない(PF=0)場合 near ジャンプする。                         |
+| 0F 89 cw/cd | JNS rel16/32  | 符号がない(SF=0)場合 near ジャンプする。                             |
+| 0F 85 cw/cd | JNZ rel16/32  | ゼロでない(ZF=0)場合 near ジャンプする。                             |
+| 0F 80 cw/cd | JO rel16/32   | オーバーフローがある(OF=1)場合 near ジャンプする。                   |
+| 0F 8A cw/cd | JP rel16/32   | パリティがある(PF=1)場合 near ジャンプする。                         |
+| 0F 8A cw/cd | JPE rel16/32  | パリティが偶数(PF=1)の場合 near ジャンプする。                       |
+| 0F 8B cw/cd | JPO rel16/32  | パリティが奇数(PF=0)の場合 near ジャンプする。                       |
+| 0F 88 cw/cd | JS rel16/32   | 符号がある(SF=1)場合 near ジャンプする。                             |
+| 0F 84 cw/cd | JZ rel16/32   | 0(ZF=1)の場合 near ジャンプする。                                    |
+
+Jcc 命令のサンプルプログラムです (図 [[fig:x86trans/jcc.lst]])。
+
+#+caption: x86trans/jcc.lst
+#+label: fig:x86trans/jcc.lst
+#+include: "code/x86trans/jcc.lst" src asm
+
+** コードリーディング
+<<sec:x86ctrl/reading>>
+
+これまでに説明したデータ転送命令、
+算術・論理演算命令、
+実行制御命令を理解すれば、
+基本的なプログラムならほとんど読めるようになっていると思います。
+
+ここで、
+GCC が生成したアセンブリ言語プログラムのコードをいくつか読んでみましょう。
+
+*** 条件分岐
+
+まず、
+条件分岐のコードです。
+以下の C 言語で書かれたプログラムを ~branch.c~ という名前で保存します。
+
+#+caption: x86ctrl/branch.c
+#+label: fig:x86ctrl/branch.c
+#+include: "code/x86ctrl/branch.c" src C
+
+その後、
+#+begin_src sh
+$ gcc -S -fno-pic -fomit-frame-pointer branch.c
+#+end_src
+によってアセンブリ言語のプログラム ~branch.s~ を生成します。
+
+#+caption: x86ctrl/branch.s
+#+label: fig:x86ctrl/branch.s
+#+include: "code/x86ctrl/branch.s" src asm
+
+GCC は非常に素直で教科書的なアセンブリ言語プログラムを生成します。
+
+GAS の疑似命令や局所ラベルの一部を削除すると、
+よりプログラムの見通しがよくなります。
+
+#+caption: x86ctrl/branch.ss
+#+label: fig:x86ctrl/branch.ss
+#+include: "code/x86ctrl/branch.ss" src asm
+
+*** 繰り返し
+
+続いて、
+無限ループの例を見てみましょう。
+以下の C 言語で書かれたプログラムを ~while.c~ という名前で保存します。
+
+#+caption: x86ctrl/while.c
+#+label: fig:x86ctrl/while.c
+#+include: "code/x86ctrl/while.c" src C
+
+先ほどと同様に、
+GCC によってアセンブリ言語のプログラム ~while.s~ を生成します。
+
+#+caption: x86ctrl/while.s
+#+label: fig:x86ctrl/while.s
+#+include: "code/x86ctrl/while.s" src asm
+
+先ほどと同様に、
+GAS の疑似命令や局所ラベルの一部を削除します。
+
+#+caption: x86ctrl/while.ss
+#+label: fig:x86ctrl/while.ss
+#+include: "code/x86ctrl/while.ss" src asm
+
+ループの後半に TEST 命令が登場しています。
+#+begin_src asm
+        testl   %eax, %eax
+#+end_src
+TEST 命令は CMP 命令の仲間です。
+CMP 命令は「宛先オペランド - 出所オペランド」の結果によってフラグレジスタを設定しますが、
+TEST 命令は「宛先オペランドと出所オペランドの論理積 (AND)」の結果によってフラグレジスタを設定します。
+
+「レジスタ EAX どうしの論理積 (AND) を計算していて、
+これは何のため?」
+と思うかもしれませんが、
+これはレジスタの値がゼロかどうかを判定する常套句です。
+同じレジスタどうしの論理積がゼロになるのは、
+元のレジスタの値がゼロの場合だけです。
+このため、
+TEST 命令によってレジスタの値がゼロかどうかが判定できます。
+
+#+begin_note
+ちなみに素直に CMP 命令を使って、
+#+begin_src asm
+        cmpl   $0, %eax
+#+end_src
+のように書いてもよいのですが、
+CMP 命令であれば機械語は 3 バイトのところ、
+TEST 命令であれば機械語は 2 バイトで済みます。
+#+end_note
+
+次に、
+もう少し複雑な ~for~ ループの例を見てみましょう。
+以下のプログラムを ~for.c~ という名前で保存します。
+
+#+caption: x86ctrl/for.c
+#+label: fig:x86ctrl/for.c
+#+include: "code/x86ctrl/for.c" src C
+
+同様に、
+GCC によってアセンブリ言語のプログラム ~for.s~ を生成します。
+
+#+caption: x86ctrl/for.s
+#+label: fig:x86ctrl/for.s
+#+include: "code/x86ctrl/for.s" src asm
+
+これも GAS の疑似命令や局所ラベルの一部を削除します。
+
+#+caption: x86ctrl/for.ss
+#+label: fig:x86ctrl/for.ss
+#+include: "code/x86ctrl/for.ss" src asm
+
+*** 関数呼び出し
+
+最後は、
+少し複雑になりますが、
+関数呼び出しの例です。
+これが読めれば IA-32 アーキテクチャのアセンブラプログラミングの基礎がマスターできたと言えるでしょう。
+
+以下の C 言語で書かれたプログラムを ~fact.c~ という名前で保存してください。
+
+#+caption: x86ctrl/fact.c
+#+label: fig:x86ctrl/fact.c
+#+include: "code/x86ctrl/fact.c" src C
+
+これまでと同じように、
+GCC によってアセンブリ言語のプログラム ~fact.s~ を生成します。
+
+#+caption: x86ctrl/fact.s
+#+label: fig:x86ctrl/fact.s
+#+include: "code/x86ctrl/fact.s" src asm
+
+GAS の疑似命令や局所ラベルの一部を削除します。
+
+#+caption: x86ctrl/fact.ss
+#+label: fig:x86ctrl/fact.ss
+#+include: "code/x86ctrl/fact.ss" src asm
+
+LEA 命令が
+#+begin_src asm
+	leal	4(%esp), %ecx
+#+end_src
+のように使われています。
+この例では、
+出所オペランドが =4(%esp)= という間接アドレス参照なので、
+実行アドレスである「ESP レジスタの値 + 4」がレジスタ ECX に格納されます。
+
+また、
+これまでに説明していない LEAVE 命令が登場しています。
+#+begin_src asm
+	leave
+#+end_src
+LEAVE 命令は、
+サブルーチンからリターンする時に行われる典型的な処理のための命令です。
+LEAVE 命令は、
+実際には、
+#+begin_src asm
+	movl	%ebp, %esp
+	popl	%ebp
+#+end_src
+という 2 命令と同じ処理を実行します。
+これに対応する処理は、
+関数 ~main~ の前半にある
+#+begin_src asm
+	pushl	%ebp
+	movl	%esp, %ebp
+#+end_src
+です。
+つまり、
+関数の前半で、
+レジスタ EBP をスタックにプッシュし、
+レジスタ EBP にスタックポインタを読み込んでいます。
+
+LEAVE 命令は、
+これに対応した後片づけをする命令です。
+つまり、
+関数の末尾で、
+(レジスタ EBP に読み込んでいた) スタックポインタの値を ESP レジスタに書き戻しています。
+さらに、
+スタックプッシュしていたレジスタ EBP の値を、
+ポップすることで復帰しています。
+
+#+begin_note
+IA-32 アーキテクチャには、
+LEAVE 命令と対になる ENTER 命令もあります。
+ENTER 命令はスタックフレームを作成する命令で、
+LEAVE 命令は作成したスタックフレームの後片付けをする命令です。
+ただし、
+GCC が生成するアセンブリ言語プログラムは、
+LEAVE 命令だけを使用し、
+ENTER 命令は使用していないようです。
+#+end_note
+
+** 章末問題
+<<sec:x86ctrl/quiz>>
+
+1. CPU には 1 セットのレジスタ (汎用レジスタ、スタックポインタ、プログ
+   ラムカウンタ) しかないにもかかわらず、オペレーティングシステム上で
+   複数のプロセスを同時に実行できる。オペレーティングシステムの仕組み
+   に関する適当な文献を読み、その理由を説明せよ。
+
+   #+begin_answer
+   単一の CPU では単一の処理しか実行できない。
+   オペレーティングシステムは、
+   100 [ms] のような短かい時間間隔ごとに実行するプロセスを切り替えるという疑似並列で動作している。
+   それぞれのプロセスの実行前にレジスタの状態をメモリから復元し、
+   プロセスの実行後にレジスタの状態をメモリに退避している。
+   #+end_answer
+
+2. レジスタ EAX の値 (符号なし整数) が 123 以上であればレジスタ EBX を
+   1 にし、そうでなければ 0 にするアセンブリ言語プログラムを示せ。
+
+3. レジスタ EAX の値 (符号なし整数) が 7〜77 の範囲内であればレジスタ
+   EBX を 1 にし、そうでなければ 0 にするアセンブリ言語プログラムを示
+   せ。
+
+4. レジスタ EAX の値 (符号付き整数) が -100〜100 の範囲内であればレジ
+   スタ EBX を 1 にし、そうでなければ 0 にするアセンブリ言語プログラム
+   を示せ。
+
+5. レジスタ EAX の値 (符号なし整数) が 0〜255 の範囲内であればレジスタ
+   EBX を 1 にし、そうでなければ 0 にするアセンブリ言語プログラムを示
+   せ。
+
+6. レジスタ EAX の値が奇数であればレジスタ EBX を 1 にし、そうでなけれ
+   ば 0 にするアセンブリ言語プログラムを示せ。
+
+   #+begin_answer
+   2.〜6. のプログラムの例: ~branch.lst~ (図 [[fig:x86ctrl/ex/branch.lst]])
+   #+caption: x86ctrl/ex/branch.lst
+   #+label: fig:x86ctrl/ex/branch.lst
+   #+include: "code/x86ctrl/ex/branch.lst" src asm
+
+   3.では、
+   レジスタ EAX の値が符号なし整数であるため、
+   JB 命令および JA 命令を使っている。
+
+   4.では、
+   レジスタ EAX の値が符号付き整数であるため、
+   JL 命令および JG 命令を使っている。
+
+   5.では、
+   4.と同じロジックで書いてもよいが、
+   「0〜255 の範囲内」は「上位 24 ビットがすべてゼロ」と同じ意味なので、
+   ビット単位の論理積である AND 命令を使用している。
+
+   6.では、
+   レジスタ EAX の最下位ビットが奇数・偶数を表しているため、
+   レジスタ EAX の最下位ビットを EBX に格納している。
+   #+end_answer
+
+7. ラベル ~jump_tbl~ にジャンプテーブルが存在する場合に、(1) 先頭のエ
+   ントリにジャンプする、(2) 2 番目のエントリにジャンプする、(3) レジ
+   スタ ECX 番目のエントリにジャンプする、アセンブリ言語プログラムをそ
+   れぞれ示せ。なお、ジャンプテーブルの各エントリには、32 ビットのジャ
+   ンプ先アドレスが格納されているとする。
+
+   #+begin_answer
+   プログラムの例: ~jumptbl.lst~ (図 [[fig:x86ctrl/ex/jumptbl.lst]])
+   #+caption: x86ctrl/ex/jumptbl.lst
+   #+label: fig:x86ctrl/ex/jumptbl.lst
+   #+include: "code/x86ctrl/ex/jumptbl.lst" src asm
+   #+end_answer
+
+8. レジスタ ESP の値をレジスタ EAX にコピーするアセンブリ言語プログラ
+   ムを示せ。
+
+9. レジスタ EIP の値をレジスタ EAX にコピーするアセンブリ言語プログラ
+   ムを示せ。
+
+   #+begin_answer
+   8.および 9. のプログラムの例: ~reg-copy.lst~ (図 [[fig:x86ctrl/ex/reg-copy.lst]])
+   #+caption: x86ctrl/ex/reg-copy.lst
+   #+label: fig:x86ctrl/ex/reg-copy.lst
+   #+include: "code/x86ctrl/ex/reg-copy.lst" src asm
+
+   プログラムカウンタ (レジスタ EIP) の値は MOV 命令等ではコピーできない。
+   このため CALL 命令によるサブルーチン呼び出しを利用している。
+   つまり、
+   CALL 命令を実行すると、
+   リターンアドレス (現在のプログラムカウンタの値) がスタックに積まれるため、
+   呼び出されたサブルーチンでスタック上のリターンアドレスをレジスタ EAX にコピーしている。
+   #+end_answer

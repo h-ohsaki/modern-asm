@@ -1,0 +1,3889 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* GNU アセンブラ (GAS)
+<<ch:gas>>
+
+** GNUアセンブラ (GAS) とは
+<<sec:gas/overview>>
+
+*** FSF と GNU プロジェクト
+
+*GNU アセンブラ (GNU assembler)* (GAS) は、
+FSF の GNU プロジェクトにおいて開発が進められている、
+さまざまなアーキテクチャに対応したアセンブラです。
+
+まず、
+FSF や GNU プロジェクトとは何か説明します。
+
+*FSF (Free Software Foundation; 自由ソフトウェア財団)* は、
+フリーな (自由な) ソフトウェアだけで構成される「GNU オペレーティングシステム」の実現を目指して 1983 年から活動を続けている非営利団体です。
+
+UNIX とは、
+もともと米国の AT&T が開発していた商用のオペレーティングシステムです。
+UNIX は商用のソフトウェアのため、
+*プロプライエタリな (proprietary; 独占的な) ソフトウェア* です。
+このため、
+UNIX を構成するプログラムやデータを自由にコピーしたり、
+改変・改造したりすることはできません。
+当然、
+UNIX のソースコードも公開されていません (当時、
+AT&T に高額なライセンス料を支払い、
+守秘義務契約を結べばソースコードを見ることは可能だったようです)。
+UNIX は優れたオペレーティングシステムですが、
+「不自由な」ソフトウェアでした。
+
+FSF は、
+UNIX 互換のオペレーティングシステムを、
+フリーな (自由な) ソフトウェアだけで実現することを目指しています。
+FSF の創始者は Richard Stallman 氏です。
+Richard Stallman 氏は、
+世界中で広く使われている GNU Emacs (エディタ) や GCC (C コンパイラ) の作者としても有名です。
+なお、
+GCC は、
+当初は「GNU C Comipler」と呼ばれる C コンパイラでしたが、
+現在は「GNU Compiler Collection」と呼ばれる、
+C、
+C++、
+Objective-C、
+Fortran、
+Ada、
+Go、
+D など複数の言語に対応したコンパイラになっています。
+
+現在、
+Linux が世界中で広く利用されています (筆者も日常的に使用しています)。
+Linux のカーネルは、
+1991 年に Linus Torvalds 氏が作成しました (1991 年に最初のバージョンが公開されました)。
+現在も Linus Torvalds 氏が Linux カーネルの開発を主導しています。
+
+Linux カーネルは GNU プロジェクトの成果物ではありません。
+しかし、
+Linux は、
+カーネルだけでなく、
+多数のシステムプログラムやアプリケーションプログラムで構成されています。
+Linux を構成する (Linux カーネル以外の) 大半のプログラムは GNU プロジェクトのソフトウェアが使われています。
+このため、
+Linux は、
+(その大部分が GNU のソフトウェアで構成されていることから) *GNU/Linux* とも呼ばれます。
+
+Linux カーネルは GNU プロジェクトの成果ではありませんが、
+Linux カーネルは *GPL (GNU General Public License; GNU 一般公的使用許諾)* というライセンスで公開されている自由ソフトウェアです。
+
+*** 無料ソフトウェアと自由ソフトウェア
+
+GNU プロジェクトは、
+フリーな (自由な) 完全なオペレーティングシステムの実現を目指しています。
+日本国内では (そして多くの国々でも) 「フリーソフトウェア」と言えば、
+多くの場合、
+#+begin_quote
+無料のソフトウェア
+#+end_quote
+という認識の人が多いと思います。
+GNU プロジェクトにおける「フリーソフトウェア」は、
+しばしば上記の「無料のソフトウェア」と混同されます。
+
+GNU プロジェクトの目指す「フリーソフトウェア」は、
+「無料ソフトウェア」ではなく、
+#+begin_quote
+*自由なソフトウェア*
+#+end_quote
+です。
+GNU プロジェクトが問題にしているのは、
+ソフトウェアの価格ではなく、
+そのソフトウェアが持つ自由です。
+
+GNU プロジェクトは *フリーソフトウェア (free software)* を以下のように説明しています \cite{FSF:Definition}。
+フリーソフトウェアの *フリー (free)* が意味するのは、
+#+begin_quote
+無料のビール (free beer)
+#+end_quote
+という意味の「無料 (free)」ではなく、
+#+begin_quote
+言論の自由 (freedom of speech)
+#+end_quote
+という意味の「自由 (free)」です。
+
+このため本書でも、
+「フリーソフトウェア」と表記するのではなく、
+*自由ソフトウェア* と表記しています。
+
+GNU プロジェクトによれば、
+以下のような条件を満たすソフトウェアが *自由ソフトウェア* です \cite{FSF:Definition}。
+- どんな目的のためにでも、プログラムを望む形で実行できる自由がある
+- 必要に応じてプログラムを変更する自由がある (この自由を実現するためは、
+  プログラムのソースコードが手に入る必要がある (ソースコードがないプロ
+  グラムの改変は技術的に困難なので)
+- 無償または有償でプログラムのコピーを自由に再配布できる
+- 変更したプログラムを自由に配布できる (これにより、あなたの改良をコミュ
+  ニティに役立てられる)
+
+普段、
+Windows や macOS など、
+商用の (プロプライエタリな) ソフトウェアを使っている人は、
+ソフトウェアの「自由」について意識する機会はあまり多くないかもしれません。
+しかし、
+みなさんが普段使っているソフトウェアの多くは自由ソフトウェアです。
+
+本書で使用している、
+アセンブラやデバッガ、
+コンパイラ、
+仮想化ソフトウェアなど、
+すべて自由ソフトウェアを使用しています。
+自由ソフトウェアですので、
+プログラムのコピーを自由に配布できます。
+筆者が便利だと思ったソフトウェアのコピーを、
+みなさんに配布できます。
+自由ソフトウェアですのでプログラムのソースコードが手に入ります。
+アセンブラや、
+デバッガ、
+コンパイラなどのソースコードを読んで学習することができます。
+先人たちが自由なソフトウェアを公開してくれたおかげで、
+それらを利用して自由に学習・研究ができます。
+
+自由ソフトウェアに興味を持ったなら、
+普段から自由なソフトウェアを利用してください。
+筆者が普段日常的に利用しているソフトウェアもすべて自由ソフトウェアです。
+このため、
+筆者が便利だと思ったソフトウェアのコピーを誰かに自由に渡せます。
+ソフトウェアに何か不具合があった場合はソースコードを読んで修正することができます。
+使っているソフトウェアが不便だと思ったら、
+ソフトウェアを改変して使うことができます (いろんなソフトウェアを改変して (パッチを当てて) 使っています)。
+
+GNU プロジェクトや自由ソフトウェアについて知るためには、
+以下の *GNU 宣言 (マニフェスト)* を読んでみてください。
+
+- GNU宣言
+
+  https://www.gnu.org/gnu/manifesto.ja.html
+
+*** GAS と GNU binutils
+
+GNU アセンブラは、
+さまざまなアーキテクチャに対応したアセンブラであり、
+GNU オペレーティングシステムの基盤となるソフトウェアの 1 つです。
+
+GNU アセンブラは、
+通常、
+~as~ または ~gas~ というプログラム名でインストールされています。
+当時、
+商用の UNIX オペレーティングシステムに搭載されていたアセンブラのコマンド名が ~as~ だったため、
+これと区別するために、
+GNU アセンブラは ~gas~ というコマンド名で使われていました。
+
+しかし現在、
+GNU/Linux では、
+通常 GNU アセンブラのみが利用されます。
+そのため、
+GNU アセンブラは ~as~ というコマンド名でインストールされていることが多いようです。
+
+GNU アセンブラ自体は、
+*GNU binutils* (binary utilities の略だと思われます) と呼ばれる、
+オブジェクトファイルやバイナリファイルを扱うためのツール群に含まれます。
+GNU binutils には、
+アセンブラに加えて、
+リンカ (複数のオブジェクトファイルを結合するためのコマンド)、
+アーカイバ (オブジェクトファイルをライブラリ化するためのコマンド)、
+オブジェクトファイルを操作するための種々のコマンドが含まれています。
+
+GNU binutils には、
+以下のようなコマンドが含まれています。
+
+| コマンド  | 機能                                                            |
+|-----------+-----------------------------------------------------------------|
+| ar        | アーカイブを作成・変更・操作する                                |
+| nm        | オブジェクトファイル中のシンボル一覧を表示する                  |
+| objcopy   | オブジェクトファイルを複製・変換する                            |
+| objdump   | オブジェクトファイルの情報を表示する                            |
+| ranlib    | アーカイブのインデックス (索引) を生成する                      |
+| size      | オブジェクトファイル/アーカイブの各セクションの大きさを表示する |
+| strings   | ファイル中に含まれる文字列を抽出する                            |
+| strip     | オブジェクトファイル中のシンボルを削除する                      |
+| c++filt   | C++ のシンボル名を解読 (demangle) する                          |
+| addr2line | アドレスをファイル名と行番号に変換する                          |
+| readelf   | ELF ファイルの中身を表示する                                    |
+| elfedit   | ELF ファイルのヘッダを更新する                                  |
+
+** GNU binutils によるバイナリファイル解析
+<<sec:gas/binutils>>
+
+GNU アセンブラの説明の前に、
+GNU binutils のコマンドの中で、
+特に便利なコマンドの利用例をいくつか紹介します。
+
+*** ar (アーカイブの作成・変更・操作)
+
+ライブラリで使われている *ar 形式* のアーカイブファイルを作成したり、
+変更したり、
+アーカイブからファイルを取り出したりするためのコマンドです。
+
+tar や、
+zip、
+7z などのアーカイバと同じように、
+複数のファイルを単一のファイルに格納することができます。
+ただし、
+zip や 7z とは異なり、
+圧縮してファイルサイズを削減したり、
+暗号化してファイルの機密性を保護したりするような機能はありません。
+
+ar 形式のアーカイブは、
+UNIX の世界では古くからライブラリに使われています。
+
+通常、
+C 言語の標準ライブラリは ~libc.a~ という名前で格納されています。
+~file~ コマンドを使って、
+~libc.a~ のファイル形式を確認してみます。
+#+begin_src sh
+$ file /usr/lib/i386-linux-gnu/libc.a
+/usr/lib/i386-linux-gnu/libc.a: current ar archive
+#+end_src
+ファイル形式が「current ar archive」と表示されています。
+ここから、
+~libc.a~ は ar 形式のアーカイブであることがわかります。
+
+~libc.a~ は ar 形式のアーカイブで、
+中身は多数のオブジェクトファイルです。
+~ar t~ (table の t) を使用して、
+~libc.a~ に格納されているオブジェクトファイルの一覧を見てみましょう (多数のファイルが表示されるためリストの冒頭のみを示しています)。
+#+begin_src sh
+$ ar t /usr/lib/i386-linux-gnu/libc.a
+init-first.o
+libc-start.o
+sysdep.o
+version.o
+check_fds.o
+	:
+	:
+#+end_src
+
+オブジェクトファイルの数を数えてみます。
+#+begin_src sh
+$ ar t /usr/lib/i386-linux-gnu/libc.a | wc -l
+1730
+#+end_src
+~libc.a~ には 1 730 個もの多数のオブジェクトファイルが含まれていることがわかります。
+
+~ar t~ に ~v~ (verbose の v) 修飾子 (modifier) を追加すれば、
+より詳細な情報が出力されます。
+#+begin_src sh
+$ ar tv /usr/lib/i386-linux-gnu/libc.a
+rw-r--r-- 0/0   1944 Jan  1 09:00 1970 init-first.o
+rw-r--r-- 0/0   7700 Jan  1 09:00 1970 libc-start.o
+rw-r--r-- 0/0   1104 Jan  1 09:00 1970 sysdep.o
+rw-r--r-- 0/0   2520 Jan  1 09:00 1970 version.o
+rw-r--r-- 0/0   1732 Jan  1 09:00 1970 check_fds.o
+rw-r--r-- 0/0   1100 Jan  1 09:00 1970 errno-loc.o
+		:
+		:
+#+end_src
+
+例として、
+C 言語の標準ライブラリ中の関数である ~printf~ が含まれているかを確認します。
+~grep~ コマンドを用いて、
+~ar~ コマンドの出力から ~printf~ という文字列が含まれている行を抽出します。
+#+begin_src sh
+$ ar t /usr/lib/i386-linux-gnu/libc.a |grep printf
+rw-r--r-- 0/0    896 Jan  1 09:00 1970 vfprintf.o
+rw-r--r-- 0/0   1180 Jan  1 09:00 1970 vprintf.o
+rw-r--r-- 0/0  16220 Jan  1 09:00 1970 printf_fp.o
+rw-r--r-- 0/0   1872 Jan  1 09:00 1970 reg-printf.o
+rw-r--r-- 0/0   1604 Jan  1 09:00 1970 printf-prs.o
+	:
+	:
+#+end_src
+~printf~ という文字列をファイル名に含んだ、
+多数のオブジェクトファイルが格納されていることがわかります。
+
+~ar x~ (extract の x) を利用して、
+関数 ~printf~ のオブジェクトファイルである ~printf.o~ を取り出してみます。
+#+begin_src sh
+$ ar xv /usr/lib/i386-linux-gnu/libc.a printf.o
+x - printf.o
+$ ls -al printf.o
+-rw-r--r-- 1 asm asm 1208 Jun 25 22:43 printf.o
+#+end_src
+現在のディレクトリにオブジェクトファイル ~printf.o~ が書き出されます。
+~ls~ コマンドで確認すると、
+1 208 バイトという非常に小さなオブジェクトファイルであることがわかります。
+たったの 1 208 バイトで、
+高機能な関数 ~printf~ を実現できるはずはありません。
+~printf.o~ は内部で他の関数を呼び出しているのだと考えられます。
+
+オブジェクトファイル ~printf.o~ がどんなファイル形式か確認します。
+#+begin_src sh
+$ file printf.o
+printf.o: ELF 32-bit LSB relocatable, Intel 80386, version 1 (SYSV), not stripped
+#+end_src
+UNIX System V で採用された *ELF (Executable and Linkable Format)* 形式であることがわかります。
+ELF 形式は、
+オブジェクトファイルや実行ファイルのためのファイル形式です。
+~file~ コマンドの出力から、
+オブジェクトファイル ~printf.o~ は、
+インテル 80386 向け 32 ビットの ELF ファイルで、
+*再配置可能 (relocatable)* であることがわかります。
+メッセージ末尾の not stripped は、
+オブジェクトファイルのシンボル情報が削除されていない (strip されていない) ことを意味しています。
+シンボル情報の削除については、
+後ほどの ~strip~ コマンドのところで説明します。
+
+*** size (オブジェクトファイル/アーカイブの各セクションの大きさ表示)
+
+GNU binutils に含まれるコマンドを使って、
+オブジェクトファイル ~printf.o~ についてさらに調べてみます。
+#+begin_src sh
+$ size -A printf.o
+printf.o  :
+section                       size   addr
+.group                           8      0
+.text                           41      0
+.data                            0      0
+.bss                             0      0
+.text.__x86.get_pc_thunk.ax      4      0
+.note.GNU-stack                  0      0
+.eh_frame                       80      0
+Total                          133
+
+
+#+end_src
+*~size~ コマンド* は、
+オブジェクトファイル中の各セクションの大きさとそのアドレスを表示します。
+上記の例では、
+*.text セクション* が機械語プログラムを格納している領域です。
+*.data セクション* と *.bss セクション* がデータ領域です。
+オブジェクトファイル ~printf.o~ の場合、
+プログラムの大きさは 41 バイトで、
+データサイズは 0 バイト (データ領域はなし) のようです。
+プログラムの大きさはたったの 41 バイトです。
+やはり関数 ~printf~ は、
+内部で他の関数を呼び出しているのでしょう。
+
+*** readelf (ELF ファイルの中身を表示)
+
+~size~ コマンドは、
+ELF 形式以外のオブジェクトファイルやアーカイブにも使える汎用のコマンドです。
+今の場合、
+オブジェクトファイル ~printf.o~ は ELF 形式であることがわかっています。
+*~readelf~ コマンド* を使って、
+オブジェクトファイル ~printf.o~ の中身をもう少し見てみましょう。
+~readelf~ コマンドに、
+ELF ファイルのヘッダを表示する ~-e~ オプションを付けて実行します。
+#+begin_src raw
+$ readelf -e printf.o
+  Class:                             ELF32
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              REL (Relocatable file)
+  Machine:                           Intel 80386
+  Version:                           0x1
+  Entry point address:               0x0
+  Start of program headers:          0 (bytes into file)
+	:
+	:
+#+end_src
+先ほど実行した ~file~ コマンドよりも、
+さらに詳しい情報が表示されています。
+「ELF Header」の Class、
+Version、
+Type、
+Machine などの情報は ~file~ コマンドでも表示されていました。
+ここではさらに、
+#+begin_src raw
+  Data:                              2's complement, little endian
+#+end_src
+から、
+数値は 2 の補数表現で、
+データの格納方式はリトルエンディアンであることがわかります。
+また、
+#+begin_src raw
+  Entry point address:               0x0
+#+end_src
+は開始アドレスが 0 であることを意味しています。
+これは、
+オブジェクトファイル ~printf.o~ が実行ファイルではない (まだリンカによって結合されていない) からです。
+
+「Section Headers」にはオブジェクトファイルに格納されている各セクションの情報が表示されています。
+機械語のプログラム本体が格納されているのは、
+先ほども登場した .text セクションです。
+当然ですが、
+~size~ コマンドで表示されていた 41 バイトというサイズと一致しています (10 進数の 41 は 16 進数で 0x29 です)。
+
+*** nm (オブジェクトファイル中のシンボル一覧を表示)
+
+さらに、
+*~nm~ コマンド* を使って、
+オブジェクトファイル ~printf.o~ に含まれるシンボルを調べてみます。
+#+begin_src raw
+$ nm printf.o
+ohsaki@asm:~/c/gas> nm printf.o 
+         U _GLOBAL_OFFSET_TABLE_
+00000000 T _IO_printf
+00000000 T __printf
+         U __vfprintf_internal
+00000000 T __x86.get_pc_thunk.ax
+00000000 T printf
+         U stdout
+#+end_src
+~nm~ コマンドはオブジェクトファイル中のシンボルの一覧を出力します。
+1 番目のカラムはシンボルのアドレス (16 進表記)、
+2 番目のカラムはシンボルの種類、
+3 番目のカラムはシンボルを表しています。
+2 番目のカラムの意味は以下のとおりです。
+
+| T | (プログラムを格納する) text セクション中の大域的なシンボル |
+| U | 未定義のシンボル                                           |
+
+これから例えば、
+- ~_IO_printf~ 、 ~__printf~ 、 ~printf~ 、 ~__x86.get_pc_thunk.ax~ の
+  4 つのシンボルは、 ~printf.o~ 中の .text セクション (プログラム) 中
+  で定義されたシンボルである
+- ~_GLOBAL_OFFSET_TABLE_~ 、 ~stdout~ 、 ~vfprintf~ というシンボルは
+  ~printf.o~中で使用されているが、これらのシンボルの実体は定義されてい
+  ない
+ということがわかります。
+
+シンボルを見るだけで、
+このオブジェクトファイルがどういったファイルなのかがおおよそ推測できます。
+つまり、
+- ~printf.o~ は、 ~_IO_printf~ 、 ~__printf~ 、 ~printf~ という名前の
+  関数を定義しているようだ
+- ~_IO_printf~ 、 ~__printf~ 、 ~printf~ という関数は、外部の
+  ~vfprintf~ を呼び出しているようだ
+などがわかります。
+
+*** objdump (オブジェクトファイルの情報を表示)
+
+オブジェクトファイル ~printf.o~ の概要がおおよそわかりました。
+.text セクションの中身 (~printf~ 関数の機械語プログラム) を見てみましょう。
+ここでは、
+逆アセンブラの機能を持つ *~objdump~ コマンド* を使います。
+#+begin_src gdb
+$ objdump -d printf.o
+
+printf.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 <_IO_printf>:
+   0:   e8 fc ff ff ff          call   1 <_IO_printf+0x1>
+   5:   05 01 00 00 00          add    $0x1,%eax
+   a:   83 ec 0c                sub    $0xc,%esp
+   d:   8d 54 24 14             lea    0x14(%esp),%edx
+  11:   6a 00                   push   $0x0
+  13:   52                      push   %edx
+  14:   ff 74 24 18             pushl  0x18(%esp)
+  18:   8b 80 00 00 00 00       mov    0x0(%eax),%eax
+  1e:   ff 30                   pushl  (%eax)
+  20:   e8 fc ff ff ff          call   21 <_IO_printf+0x21>
+  25:   83 c4 1c                add    $0x1c,%esp
+  28:   c3                      ret    
+
+Disassembly of section .text.__x86.get_pc_thunk.ax:
+
+00000000 <__x86.get_pc_thunk.ax>:
+   0:   8b 04 24                mov    (%esp),%eax
+   3:   c3                      ret    
+#+end_src
+~objdump~ コマンドに ~-d~ (disassemble の d) オプションを指定すると、
+実行可能なセクション (機械語のプログラムが格納されているセクション) を逆アセンブルします。
+
+左から順番にアドレス、
+機械語のプログラム、
+逆アセンブル結果です。
+例えば、
+#+begin_src gdb
+  1e:   ff 30                   pushl  (%eax)
+#+end_src
+という行は、
+16 進数で 0x1e 番地のアドレスに格納されている、
+2 バイトの機械語プログラム (0xff、
+0x30) を逆アセンブルした結果を表しています。
+2 バイトの機械語が、
+\inst{pushl (%eax)} に対応することを意味しています。
+これは場合、
+レジスタ EAX の値が指すアドレスに格納されている 32 ビットの値をスタックにプッシュする命令です。
+
+逆アセンブル結果を眺めると、
+~push~、
+~call~、
+~add~、
+~mov~、
+~pop~、
+~ret~ など、
+見たことがある命令のニーモニックが並んでいます。
+41 バイトの短い機械語プログラムなので、
+少し時間をかければ読めそうです。
+
+ただ、
+オブジェクトファイル ~printf.o~ は再配置可能なプログラムであり、
+通常の実行ファイルと比べて中身がわかりづらくなっています。
+例えば、
+逆アセンブル結果を見ると、
+サブルーチンを呼び出している ~call~ 命令が
+#+begin_src gdb
+   0:   e8 fc ff ff ff          call   1 <_IO_printf+0x1>
+#+end_src
+と
+#+begin_src gdb
+  20:   e8 fc ff ff ff          call   21 <_IO_printf+0x21>
+#+end_src
+の 2 カ所にあります。
+ただし、
+サブルーチンの呼び出しアドレスが 1 番地、
+21 番地となっており、
+どちらも ~printf~ 関数の内部のアドレス (自分自身をサブルーチンコールしている?)
+ように読めます。
+~call~ 命令のアドレスをサブルーチン呼び出ししても無意味です (例えば、
+最初の ~call~ 命令は 0 番地から配置されているので、
+1 番地から解釈すると不正な命令になります)。
+
+これは、
+オブジェクトファイル ~printf.o~ が再配置可能なプログラムであることが原因です。
+サブルーチンの呼び出しアドレスは、
+最終的にリンカによって結合された時点で確定します。
+このオブジェクトファイルはまだリンクされていないので、
+あちこちのアドレスが未確定のままになっています。
+上記の例では、
+~call~ 命令の呼び出しアドレスはまだ確定していないため 0xfffffffc という値になっています。
+
+~call~ 命令の呼び出しアドレスがどのシンボルに対応するかは、
+ELF 形式のオブジェクトファイルの *.rel.text セクション* に格納されている *再配置 (relocation)* エントリを見ればわかります。
+~objdump~ コマンドに ~-r~ オプション (relocation entries の r) を指定して実行します。
+#+begin_src gdb
+$ objdump  -r printf.o
+
+printf.o:     file format elf32-i386
+
+RELOCATION RECORDS FOR [.text]:
+OFFSET   TYPE              VALUE 
+00000001 R_386_PC32        __x86.get_pc_thunk.ax
+00000006 R_386_GOTPC       _GLOBAL_OFFSET_TABLE_
+0000001a R_386_GOT32X      stdout
+00000021 R_386_PC32        __vfprintf_internal
+
+
+RELOCATION RECORDS FOR [.eh_frame]:
+OFFSET   TYPE              VALUE 
+00000020 R_386_PC32        .text
+00000044 R_386_PC32        .text.__x86.get_pc_thunk.ax
+
+
+#+end_src
+OFFSET、
+TYPE、
+VALUE は、
+各セクションの先頭からのオフセット、
+TYPE はエントリの種別、
+VALUE はシンボルを表しています。
+例えば、
+#+begin_src gdb
+00000021 R_386_PC32        __vfprintf_internal
+#+end_src
+という行は、
+.text セクションの先頭から 0x00000021 バイト目からの 32 ビットは ~__vfprintf_internal~ というシンボルのアドレスに置き換えられることを意味しています。
+したがって、
+上の出力の中の以下の 3 行
+#+begin_src gdb
+00000001 R_386_PC32        __x86.get_pc_thunk.ax
+0000001a R_386_GOT32X      stdout
+00000021 R_386_PC32        __vfprintf_internal
+#+end_src
+から、
+#+begin_src gdb
+   0:   e8 fc ff ff ff          call   1 <_IO_printf+0x1>
+#+end_src
+は ~__x86.get_pc_thunk.ax~ への呼び出しであることがわかります。
+また、
+#+begin_src gdb
+  18:   8b 80 00 00 00 00       mov    0x0(%eax),%eax
+#+end_src
+はシンボル ~stdout~ のアドレスをレジスタ EAX に格納していることがわかります。
+さらに、
+#+begin_src gdb
+  20:   e8 fc ff ff ff          call   21 <_IO_printf+0x21>
+#+end_src
+は関数 ~__vfprintf_internal~ への呼び出しであることがわかります。
+
+これらの分析結果から、
+オブジェクトファイル ~printf.o~ 中の ~printf~ 関数は、
+「出力ストリームに ~stdout~ を指定して、
+関数 ~__vfprintf_internal~ を呼び出すだけの関数である」ことがわかります。
+
+なお、
+逆アセンブル結果を見ると、
+#+begin_src gdb
+00000000 <_IO_printf>:
+#+end_src
+と表示されていて ~_IO_printf~ 関数だけ定義されているように見えます。
+肝心の ~printf~ 関数はどこに行ったのでしょうか?
+
+この疑問は、
+オブジェクトファイル ~printf.o~ の *シンボルテーブル* を見ればわかります。
+~objdump~ コマンドに ~-t~ オプション (symbol table の t) を付けて実行します。
+#+begin_src gdb
+$ objdump -t printf.o
+
+printf.o:     file format elf32-i386
+
+SYMBOL TABLE:
+00000000 l    d  .text  00000000 .text
+00000000 l    d  .text.__x86.get_pc_thunk.ax    00000000 .text.__x86.get_pc_thunk.ax
+00000000 l    d  .group 00000000 .group
+00000000 l    d  .data  00000000 .data
+00000000 l    d  .bss   00000000 .bss
+00000000 l    d  .note.GNU-stack        00000000 .note.GNU-stack
+00000000 l    d  .eh_frame      00000000 .eh_frame
+00000000 g     F .text  00000029 __printf
+00000000 g     F .text.__x86.get_pc_thunk.ax    00000000 .hidden __x86.get_pc_thunk.ax
+00000000         *UND*  00000000 _GLOBAL_OFFSET_TABLE_
+00000000         *UND*  00000000 stdout
+00000000         *UND*  00000000 .hidden __vfprintf_internal
+00000000 g     F .text  00000029 _IO_printf
+00000000 g     F .text  00000029 printf
+
+
+#+end_src
+先ほどの ~nm~ コマンドの出力と同じような内容ですが、
+~objdump~ コマンドのほうがより詳細な情報を表示しています。
+上の出力中の以下の 3 行
+#+begin_src gdb
+00000000 g     F .text  00000029 __printf
+00000000 g     F .text  00000029 _IO_printf
+00000000 g     F .text  00000029 printf
+#+end_src
+に着目します。
+すべてアドレスが等しく 0x00000000 であることがわかります。
+これより、
+~printf.o~ の .text セクションの 0 番地に、
+~__printf~、
+~_IO_printf~、
+~printf~ という 3 つのシンボルが存在することがわかります。
+このため、
+オブジェクトファイル ~printf.o~ 中の ~printf~ 関数は、
+~__printf~ 関数や ~_IO_printf~ 関数としても呼び出すことができるのです。
+
+*** strings (ファイル中に含まれる文字列を抽出)
+
+GNU binutils に含まれているコマンドのうち、
+便利と思われるもの (筆者が普段使っているもの) をあと 2 つ紹介しましょう。
+
+~strings~ コマンドはバイナリファイル中の文字列を抽出するプログラムです。
+素性のよくわからないバイナリファイルがあるときに、
+それがどのようなファイルであるかを推測するときに役立ちます。
+
+例えば、
+~foo~ という名前の、
+正体不明のバイナリファイルがあったとします。
+~ls~ コマンドでファイルサイズを、
+~file~ コマンドでファイル形式をチェックしてみます。
+#+begin_src sh
+$ ls -l foo
+-rwxr-xr-x 1 asm asm 79652 Feb 17 20:22 foo
+asm@debian:~$ file foo
+foo: ELF 32-bit LSB pie executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=29fe8dbd105997f7b5b1bb14b2941a8bd2682006, stripped
+#+end_src
+ファイルサイズは 79 652 バイトです。
+ファイル形式は ELF 形式の実行ファイルのようです。
+
+#+begin_quote
+よくわからない実行ファイルは、
+取りあえず実行してみる
+#+end_quote
+というのは絶対にやってはいけない危険な行為です。
+ファイルシステム上の重要なファイルを削除されるかもしれません。
+オペレーティングシステムにバックドア (外部から侵入できるようにするための裏口) を仕掛けられるかもしれません。
+
+~file~ コマンドの出力に「dynamically linked」という表示があるので、
+ダイナミックリンクされた実行ファイルです。
+どのような共有ライブラリとリンクされているかを ~ldd~ コマンドでチェックします。
+#+begin_src sh
+$ ldd foo
+        linux-gate.so.1 (0xb7f1f000)
+        libc.so.6 => /lib/i386-linux-gnu/libc.so.6 (0xb7d1f000)
+        /lib/ld-linux.so.2 (0xb7f21000)
+#+end_src
+リンクされているのは C の標準ライブラリ ~libc.so.6~ のみです。
+したがって、
+GUI (Graphical User Interface) やネットワークのソケット API 等を利用するプログラムではなさそうです。
+ファイルサイズも 79 652 バイトと小さいことから、
+CUI (Character User Interface) で動作する単純なプログラムのように思えます。
+
+#+begin_note
+~ldd~ コマンドの出力には ~linux-gate.so.1~ と ~/lib/ld-linux.so.2~ も表示されています。
+
+少し細かい話になりますが、
+~linux-gate.so.1~ は Linux カーネルが提供する VDSO (Virtual Dynamic Shared Object) です。
+共有ライブラリの一種ですが、
+ファイルシステム上に共有ライブラリの実体はなく、
+Linux カーネル中に存在します (したがって、
+~ldd~ コマンドの出力に共有ライブラリのファイル名が表示されていません)。
+
+~ld-linux.so.2~ は ELF 形式の実行ファイルのためのダイナミックリンカです。
+ELF 形式の実行ファイルと共有ライブラリをリンクして起動するためのプログラムです。
+
+VDSO については /vdso(7)/ に、
+~ld-linux.so~ については /ld-linux.so(8)/ に説明があります。
+#+end_note
+
+こういったときに、
+~strings~ コマンドが役立ちます。
+
+~strings~ コマンドを使用して、
+正体不明の実行ファイル ~foo~ 中に含まれる文字列を表示します。
+#+begin_src raw
+$ strings foo
+/lib/ld-linux.so.2
+libc.so.6
+_IO_stdin_used
+fflush
+__printf_chk
+setlocale
+mbrtowc
+strncmp
+dcngettext
+optind
+strrchr
+dcgettext
+iswprint
+realloc
+abort
+stdin
+_exit
+program_invocation_name
+__assert_fail
+__ctype_get_mb_cur_max
+	:
+	:
+#+end_src
+~strings~ コマンドは、
+その名前どおり (strings = 「文字列」の複数形)、
+ファイル中に含まれる 4 文字以上の文字列をすべて出力します。
+ファイルはバイナリファイルでもテキストでもかまいません。
+ただし、
+テキストファイルであれば、
+ページャやエディタで中身を見れば十分です。
+~strings~ コマンドは通常はバイナリファイルに対して用いられます。
+
+上の例では、
+ファイル ~foo~ に含まれる、
+シンボルと思われる文字列が多数表示されています。
+シンボルの一覧を取得するのであれば、
+上で紹介した ~nm~ コマンドや ~objdump~ コマンドが利用できます。
+~strings~ コマンドが役立つのは、
+データ領域に含まれる、
+メッセージ等の文字列です。
+
+上の ~strings~ コマンドの出力を眺めていると、
+以下のような箇所が見つかりました。
+#+begin_src raw
+	:
+	:
+BLAKE2
+RFC 7693
+test invocation
+Multi-call invocation
+sha224sum
+sha2 utilities
+sha256sum
+sha384sum
+sha512sum
+%s online help: <%s>
+GNU coreutils
+/usr/share/locale
+invalid length
+invalid length: %s
+length is not a multiple of 8
+Samuel Neves
+Padraig Brady
+l:bctwz
+standard input
+%s: too many checksum lines
+FAILED open or read
+FAILED
+%s: read error
+%s: no file was verified
+	:
+	:
+#+end_src
+
+BLAKE2 や RFC 7693、
+sha2、
+sha256sum などの文字列が表れています。
+少し調べるとわかりますが、
+BLAKE2 はハッシュ関数のアルゴリズムです。
+RFC 7693 は「The BLAKE2 Cryptographic Hash and Message Authentication Code (MAC)」というタイトルの RFC です。
+ここから BLAKE2 や SHA-2 のようなハッシュ値に関するプログラムであると予想できます。
+
+#+begin_note
+RFC (Requst For Comments) とはインターネットの標準化団体である IETF (Internet Engineering Task Force) が公開している通信規格の文書です。
+#+end_note
+
+また、
+「too many checksum lines」、
+「read error」、
+「no file was verified」のような、
+プログラム ~foo~ のエラーメッセージが見つかります。
+ここからプログラム ~foo~ は、
+ファイルからハッシュ値を読み込んで、
+ハッシュ値の正しさを検証する機能を持っていそうだ、
+ということがわかります。
+逆に、
+「write」や「save」等の単語は登場していないため、
+プログラム ~foo~ はファイルへの書き出しはしないのでは、
+と思われます。
+
+#+begin_note
+もちろん、
+プログラム ~foo~ は、
+メッセージを出力せずにファイルに書き出すプログラムである可能性はあります。
+ファイルへの書き出し失敗時にも、
+エラーメッセージを表示せずに黙って終了するというプログラムなのかもしれません。
+ただし、
+いろいろな警告やエラーメッセージが用意されているプログラムのようなので、
+その可能性は低そうに見えます。
+#+end_note
+
+このように、
+~strings~ コマンドを使うと、
+バイナリファイル中に含まれる文字列を抽出することができます。
+もちろん、
+バイナリエディタを使ってバイナリファイルの中身を見ることもできます。
+ただし、
+調べたいものが文字列であれば、
+~strings~ コマンドを使ったほうがはるかに効率的です。
+
+#+begin_note
+実はプログラム ~foo~ の正体は GNU coreutils に含まれている ~b2sum~ コマンドです。
+~b2sum~ コマンドは、
+MD5 ダイジェストを計算する ~md5sum~ コマンドや、
+SHA-256 ダイジェストを計算する ~sha256sum~ コマンドの仲間です。
+
+例えば、
+以下のようにすれば、
+あるファイル ~bar~ の BLAKE2 ダイジェストを求められます。
+#+begin_src sh
+$ b2sum bar
+c84a81c3dd09b1e8533ba48dbe6eb14878f6c89aea6c5ce05dfd1aba3cc5b61fb7332dc4f4e54e6d15c678d92467afce1119824e227236c48f5f73c929539219  bar
+#+end_src
+ダイジェストは、
+ファイル ~bar~ の内容から決まるハッシュ値です。
+この値を使うことにより、
+ファイル ~bar~ の内容が改竄 (かいざん) されているかを確認できます。
+つまり、
+ファイル ~bar~ の BLAKE2 ダイジェストを再度計算して、
+ダイジェストが上記の値と一致しなければファイルの中身が同一ではないことを意味します。
+
+ファイル ~bar~ の最初の 1 バイトを、
+文字「0 (ASCII は 0x30)」に置き換えたファイルを作成してみます。
+#+begin_src sh
+$ (echo -n 0; dd if=bar bs=1 skip=1) >baz
+79651+0 records in
+79651+0 records out
+79651 bytes (80 kB, 78 KiB) copied, 0.231611 s, 344 kB/s
+$ ls -l bar baz
+-rw-r--r-- 1 asm asm 79652 Feb 17 22:39 bar
+-rw-r--r-- 1 asm asm 79652 Feb 17 22:36 baz
+#+end_src
+最初の 1 バイトを書き換えただけなので、
+ファイル ~bar~ もファイル ~baz~ も同じ大きさです。
+
+ファイル ~baz~ の BLAKE2 ダイジェストを計算すると、
+1 バイトしか異ならないにもかかわらず、
+ファイル ~bar~ とはまったく違うダイジェストになります。
+#+begin_src sh
+$ b2sum baz
+a813d5812bb44bb1d8f4736ee4949ce1044dbf842f9f3e8efe18f0848b43e02915bf1d658b4c4f5966030239771696615c66ea2403fe15d1ce298fca5d2d598b  baz
+#+end_src
+#+end_note
+
+*** strip (オブジェクトファイル中のシンボルを削除)
+
+最後に紹介するのは ~strip~ コマンドです。
+実行ファイルやオブジェクトファイル中のシンボルを削除するプログラムです。
+~strip~ コマンドを使えば、
+実行ファイルやオブジェクトファイルのファイルサイズを小さくできます。
+
+ここでは例として、
+GNU Emacs の実行ファイルを取り上げます。
+GNU Emacs は単に例として取り上げただけで、
+以下の話はあらゆる実行ファイル (実行形式のオブジェクトファイル) に対して当てはまります。
+
+例えば、
+GNU Emacs バージョン 27.1 をソースコードから構築すると、
+~emacs-27.1~ という名前の実行ファイルが得られます。
+GNU Emacs 自体、
+複雑なプログラムであり、
+GNU Emacs の実行ファイルは約 31 M バイトもあります。
+#+begin_src sh
+$ ls -l emacs-27.1
+-rwxr-xr-x 1 asm asm 32176856 Feb 17 22:59 emacs-27.1
+#+end_src
+
+今時の高速なコンピュータであれば、
+31 M バイトという実行ファイルは許容範囲内かもしれません。
+しかし、
+GNU Emacs を Raspberry Pi や BeagleBone Black のようなワンボードコンピュータなどで動かす場合、
+31 M バイトの実行ファイルはかなりの負担です。
+実行ファイルが小さければ、
+それだけファイルシステムにも余裕ができます。
+また、
+実行ファイルが小さければ、
+それだけプログラムの起動も高速になります。
+特に、
+ファイルシステムを、
+microSD カードや USB メモリのような低速なデバイス上に構築している場合は大きな差になります。
+
+実行ファイルに対して ~strip~ コマンドを実行するだけで、
+実行ファイルのファイルサイズが劇的に小さくなります。
+#+begin_src sh
+$ strip emacs-27.1
+$ ls -l emacs-27.1
+-rwxr-xr-x 1 asm asm 6127960 Feb 17 22:59 emacs-27.1
+#+end_src
+~strip~ コマンドを実行するだけで、
+GNU Emacs の実行ファイルのサイズが、
+なんと約 31 M バイトから約 6 M バイトに削減されました ! 実行ファイルのサイズが約 1/5 に減っています。
+
+なぜこんなことができるかといえば、それは
+#+begin_quote
+~strip~ コマンドは実行ファイル中のシンボルをすべて削除している
+#+end_quote
+からです。
+オブジェクトファイルや実行ファイルには、
+通常、
+シンボルの情報が含まれています。
+
+さきほど、
+~nm~ コマンドや ~objdump~ コマンドを用いてオブジェクトファイルのシンボルを調査しました。
+ダイナミックリンクを行うオブジェクトファイルやライブラリにとってシンボルは不可欠です。
+しかし、
+実行ファイルのシンボルは、
+プログラムの実行そのものには必要ありません。
+このため、
+実行ファイルのシンボルを削除すると、
+(実行ファイルの種類にもよりますが) ファイルサイズが小さくなります。
+
+上の GNU Emacs バージョン 27.1 の実行ファイル ~emacs-27.1~ は、
+ソースコードから構築したものでした。
+デフォルトでは、
+デバッグ情報やシンボルを含んだ状態で実行ファイルが構築されます。
+こういったシンボルは GNU Emacs の動作そのものには不要です。
+したがって、
+~strip~ コマンドでシンボルをすべて削除しても問題ないのです。
+
+#+begin_note
+実行ファイルのシンボルは、
+プログラムの動作そのものには不要ですが、
+プログラムのデバッグには非常に有用です。
+
+デバッガでプログラムの動作をトレースする場合には、
+実行ファイル中のデバッグ情報やシンボルが役立ちます。
+このため、
+プログラムデバッグが完了するまではシンボルを残しておきます。
+今後、
+もうプログラムのデバッグは必要ない (もしくは必要であれば再度実行ファイルを構築すればよい) とき、
+~strip~ コマンドでシンボルを削除する、
+という使い方をします。
+#+end_note
+
+~strip~ コマンドでシンボルを削除してしまったので、
+当然ですが、
+~nm~ コマンドや ~objdump~ コマンド等でシンボルを表示させても何も見つかりません。
+#+begin_src sh
+$ nm emacs-27.1
+nm: emacs-27.1: no symbols
+$ objdump -t emacs-27.1
+
+emacs-27.1:     file format elf32-i386
+
+SYMBOL TABLE:
+no symbols
+
+#+end_src
+
+*** プログラムやライブラリを解析する上での注意
+
+商用ソフトウェアのほとんどは、
+「自由ソフトウェア」ではありません。
+自由でないソフトウェアでは、
+多くの場合、
+リバースエンジニアリングが禁じられています。
+通常、
+ソフトウェアをどのように利用してよいかは、
+EULA (End-User License Agreement; エンドユーザライセンス契約、
+使用許諾契約書) のようなライセンス契約に記載されています。
+商用ソフトウェアでは、
+ソフトウェアのコピーや変更はもちろんのこと、
+逆アセンブルやリバースエンジニアリングも禁じられていることが一般的です。
+
+上で示したような、
+オブジェクトファイルや、
+実行ファイル、
+ライブラリの分析を行う場合は、
+必ずライセンス契約に違反していないことを確認してください。
+ソースコードが公開されていないソフトウェアのほとんどは、
+逆コンパイルやリバースエンジニアリングが認められていません。
+したがって、
+例えば、
+Windows や macOS などのオペレーティングシステムに含まれるファイルのほとんどは、
+逆アセンブルやリバースエンジニアリングが禁止されています。
+
+GNU/Linux の大部分は自由ソフトウェアで構成されています。
+しかし、
+Linux ディストリビューションによっては、
+一部自由ソフトウェアではない、
+プロプライエタリな (独占的な) ソフトウェアが含まれていることもあります。
+プログラムやライブラリの中身を分析する場合には、
+必ずライセンスに違反していないことを確認してください。
+
+上の例では、
+C 言語の標準ライブラリとして、
+これも GNU プロジェクトの成果物である glibc (GNU C ライブラリ) を使いました。
+ファイル ~/usr/lib/i386-linux-gnu/libc.a~ が glibc の本体です。
+glibc も自由ソフトウェアなので、
+ソフトウェアのコピー・変更・分析が認められています。
+オブジェクトファイル ~printf.o~ を逆アセンブルできるのも、
+逆アセンブル結果を本書で発表できるのも、
+glibc が自由なソフトウェアだからです。
+
+プログラミング学習には (そして普段の作業にも)、
+プログラムの研究や分析が自由に行える「自由ソフトウェア」を使うことをおすすめします。
+
+*** ソースコードがあればバイナリファイルの解析は不要?
+
+ここまで、
+GNU binutils のツールを使って、
+自由ソフトウェアである glibc (C 言語の標準ライブラリ) ライブラリ中の関数 ~printf~ を分析する手法を説明しました。
+
+ここまで読んで、
+#+begin_quote
+あれ、
+glibc が自由ソフトウェアなら、
+ソースコードが入手できるのではないか?
+ソースコードが入手できるなら、
+わざわざバイナリファイル (オブジェクトファイルや、
+実行ファイル、
+ライブラリなど) を分析する必要ないのでは?
+#+end_quote
+と思ったかもしれません。
+
+その疑問に対する答えは、
+#+begin_quote
+部分的には Yes で、
+部分的には No
+#+end_quote
+です。
+
+ある意味ではそのとおり (バイナリファイルの分析は不要) です。
+glibc の関数 ~printf~ の中身を知りたいなら、
+glibc のソースコードを入手して読むのが一番です。
+通常、
+プログラムのソースコードが最も有用な情報源です。
+
+glibc は自由ソフトウェアであり、
+glibc のソースコードは簡単に手に入ります。
+例えば glibc の場合であれば、
+
+- The GNU C Library (glibc)
+
+  https://www.gnu.org/software/libc/
+
+からソースコード一式をダウンロードできます。
+
+オペレーティングシステムが Debian GNU/Linux であれば、
+~apt-get~ コマンドによってパッケージのソースコード一式が簡単に取得できます。
+Debian GNU/Linux における glibc のパッケージ名は ~libc6~ です。
+~apt-get~ コマンドで ~libc6~ のソースコード一式をダウンロードします。
+#+begin_src raw
+$ apt-get source libc6
+Reading package lists... Done
+Picking 'glibc' as source package instead of 'libc6'
+NOTICE: 'glibc' packaging is maintained in the 'Git' version control system at:
+https://salsa.debian.org/glibc-team/glibc.git
+Please use:
+git clone https://salsa.debian.org/glibc-team/glibc.git
+to retrieve the latest (possibly unreleased) updates to the package.
+Need to get 18.2 MB of source archives.
+Get:1 http://deb.debian.org/debian bullseye/main glibc 2.31-12 (dsc) [8315 B]
+Get:2 http://deb.debian.org/debian bullseye/main glibc 2.31-12 (tar) [17.3 MB]
+Get:3 http://deb.debian.org/debian bullseye/main glibc 2.31-12 (diff) [911 kB]
+Fetched 18.2 MB in 6s (3293 kB/s)
+dpkg-source: info: extracting glibc in glibc-2.31
+dpkg-source: info: unpacking glibc_2.31.orig.tar.xz
+dpkg-source: info: unpacking glibc_2.31-12.debian.tar.xz
+dpkg-source: info: using patch list from debian/patches/series
+	:
+	:
+dpkg-source: info: applying any/local-revert-bz13979.diff
+dpkg-source: info: applying any/unsubmitted-ldso-machine-mismatch.diff
+dpkg-source: info: applying any/local-ldconfig-ignore-ld.so.diff
+dpkg-source: info: applying any/local-bootstrap-headers.diff
+dpkg-source: info: applying any/submitted-resolv-unaligned.diff
+dpkg-source: info: applying any/local-cudacc-float128.diff
+dpkg-source: info: applying any/submitted-ld.so-cache-new-format.diff
+dpkg-source: info: applying any/local-test-install.diff
+dpkg-source: info: applying any/git-surplus-tls-accounting.diff
+dpkg-source: info: applying any/git-ld.so-cache-endianness-markup.diff
+#+end_src
+これにより、
+Debian GNU/Linux の ~libc6~ パッケージのソースコード一式が、
+カレントディレクトリ以下に展開されます。
+
+通常、
+オブジェクトファイル ~printf.o~ に対応するソースコードは ~printf.c~ です。
+~find~ コマンドなどで ~printf.c~ という名前のファイルを探せばすぐに見つかります。
+#+begin_src raw
+$ find . -name printf.c
+./glibc-2.31/stdio-common/printf.c
+#+end_src
+
+~printf.c~ は以下のような内容です (図 [[fig:gas/printf.c]])。
+
+#+caption: gas/printf.c
+#+label: fig:gas/printf.c
+#+include: "code/gas/printf.c" src C
+
+これを読むと、
+関数 ~__printf~ の内部から関数 ~__vfprintf_internal~ を呼び出していることは一目でわかります。
+
+ただし、
+~__printf~ 関数に、
+~printf~ や ~_IO_printf~ という名前が付いている (~__printf~ 関数も ~printf~ 関数も実体は同じである) ことはすぐにはわかりません。
+~printf.c~ の最後の
+#+begin_src C
+ldbl_strong_alias (__printf, printf);
+/* This is for libg++.  */
+ldbl_strong_alias (__printf, _IO_printf);
+#+end_src
+あたりが関係していそうですが、
+~ldbl_strong_alias~ が何をしているかなどをもう少し追いかけないとわかりません。
+
+glibc のソースコードを追いかけるとわかりますが、
+少なくとも glibc バージョン 2.31 では、
+- ~ldbl_strong_alias~ は C のプリプロセッサのマクロになってい
+  て、~strong_alias~ に置換される
+- ~strong_alias~ も C のプリプロセッサのマクロになってい
+  て、~_strong_alias~ に置換される
+- ~_strong_alias~ も C のプリプロセッサのマクロになっていて、~typedef~
+  宣言に展開される (これによって関数の別名が定義される)
+という仕組みになっています。
+
+「わざわざバイナリファイルを分析する必要はないのでは?」
+というのは、
+ある意味では違います。
+
+上の例のように、
+~printf.c~ 中の ~ldbl_strong_alias~ が何を行っているかをソースコードだけを用いて分析するのは結構大変です。
+glibc バージョン 2.31 の場合、
+C 言語で書かれたソースコードのファイルは計 14 442 個もあります。
+もちろん、
+例えば ~ldbl_strong_alias~ の挙動を理解するためだけなら、
+すべてのソースコードを読む必要はありません。
+しかし、
+「~ldbl_strong_alias~ は最終的に typedef 宣言に展開される」ことを突き止めるためには多数のファイルを調べる必要があります。
+
+#+begin_note
+「高級言語で書かれた、
+多数のソースコードを読む」ような作業を支援するツールもたくさんあります。
+私は、
+主に GNU Emacs の ~etags~ コマンドや GNU global を使っています。
+他にも高級言語によっては自作のソースコード分析ツールも利用します。
+C 言語で書かれたプログラムであれば ~cflow~ コマンドを使うこともあります。
+#+end_note
+
+オブジェクトファイルや実行ファイルは
+#+begin_quote
+実際に動いているもの
+#+end_quote
+です。
+このため、
+ソースコードを調べるよりも、
+オブジェクトファイルや、
+実行ファイル、
+ライブラリなどのバイナリファイルを調べたほうが簡単なケースも多くあります。
+電気製品に例えると、
+ソースコードは設計図に相当し、
+バイナリファイルは実際の製品 (実機) に相当します。
+「何を調べたいか」によって、
+設計図を調べたほうがよいケースもあれば、
+実際の製品 (実機) を調べたほうがよいケースもあります。
+
+ソースコードと、
+実行ファイル、
+ライブラリなどのバイナリファイルはそもそも性質が違います。
+このため、
+#+begin_quote
+プログラムのソースコード「だけ」で分析する
+#+end_quote
+よりも
+#+begin_quote
+プログラムのソースコード「と」バイナリファイルの両方で分析する
+#+end_quote
+ほうが効率がよいのはある意味当然です。
+プログラムを分析するときに、
+「ソースコード」か「バイナリファイル」のどちらかしか選べないなら、
+当然ソースコードを選ぶでしょう。
+しかし、
+「ソースコード」と「バイナリファイル」を選べるなら、
+両方を使ったほうが効率的な分析が可能です。
+
+** GNU アセンブラを使ってみる
+<<sec:gas/usage>>
+
+*** アセンブリ言語プログラムのアセンブル
+
+では、
+GNU アセンブラ (GAS) の説明に移りましょう。
+
+何はともあれ、
+まず、
+GNU アセンブラを実際に使ってみましょう。
+以下のアセンブリ言語プログラムを ~add.s~ という名前で保存します。
+
+#+caption: gas/add.s
+#+label: fig:gas/add.s
+#+include: "code/gas/add.s" src asm
+
+GAS でアセンブルして実際に実行できる、
+ほぼ最小構成のアセンブリ言語プログラムです。
+12 + 34 を計算し、
+Linux カーネルの ~exit~ システムコールを呼び出して終了するだけのプログラムです。
+ただし、
+12 + 34 の計算結果はプログラムの *終了ステータス (exit status)* として返しています。
+アセンブリ言語プログラムの詳細はまだわからなくても大丈夫です。
+今の段階では、
+おおよそ何をしているプログラムなのかを理解すれば十分です。
+
+GAS (~as~ コマンド) を以下のように実行して、
+アセンブリ言語プログラム ~add.s~ をオブジェクトファイルにアセンブルします。
+#+begin_src raw
+$ as -a -o add.o add.s
+GAS LISTING add.s                       page 1
+
+
+   1                            .global _start
+   2                            .text
+   3                    _start: 
+   4 0000 B80C0000              movl    $12,%eax  # レジスタ EAX に 12 を格納
+   4      00
+   5 0005 83C022                addl    $34,%eax  # レジスタ EAX に 34 を加える
+   6                            
+   7 0008 89C3                  movl    %eax,%ebx # レジスタ EAX の値をレジスタ EBX にコピー
+   8 000a B8010000              movl    $1,%eax   # システムコール 1 番は exit
+   8      00
+   9 000f CD80                  int     $0x80     # システムコール実行
+GAS LISTING add.s                       page 2
+
+
+DEFINED SYMBOLS
+               add.s:3      .text:0000000000000000 _start
+
+NO UNDEFINED SYMBOLS
+#+end_src
+~-a~ オプションを指定したため、
+アセンブル結果を標準出力に表示しています。
+また、
+~-o~ オプションによって、
+生成するオブジェクトファイルのファイル名を指定しています。
+
+~as~ コマンドの出力は、
+[[sec:gas/overview]] 節で説明した ~objdump~ コマンドの逆アセンブル結果と似ています。
+例えば、
+#+begin_src asm
+   4 0000 B80C0000              movl    $12,%eax  # レジスタ EAX に 12 を格納
+   4      00
+#+end_src
+という行は、
+左からソースコードの行番号 (4 行目)、
+生成された機械語のプログラム (0xb8、
+0x0c、
+0x00、
+0x00、
+0x00 の 5 バイト)、
+逆アセンブル結果 (\inst{movl $12,%eax}) を表しています。
+
+特にエラーメッセージが表示されることなく、
+ソースコード ~add.s~ からオブジェクトファイル ~add.o~ が生成されました。
+#+begin_src sh
+$ ls -l add.o
+-rw-r--r-- 1 asm asm 484 Feb 18 18:04 add.o
+$ file add.o
+add.o: ELF 32-bit LSB relocatable, Intel 80386, version 1 (SYSV), not stripped
+#+end_src
+ファイルサイズは 484 バイト、
+ファイル形式は 32 ビットの ELF 形式です。
+
+~objdump~ コマンドで逆アセンブルしてみましょう。
+#+begin_src sh
+$ objdump -d add.o
+
+add.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 <_start>:
+   0:   b8 0c 00 00 00          mov    $0xc,%eax
+   5:   83 c0 22                add    $0x22,%eax
+   8:   89 c3                   mov    %eax,%ebx
+   a:   b8 01 00 00 00          mov    $0x1,%eax
+   f:   cd 80                   int    $0x80
+#+end_src
+ソースコード ~add.s~ には 5 命令が含まれていました。
+オブジェクトファイルにも同じ 5 命令が含まれていることがわかります。
+また、
+アセンブリ言語と機械語が一対一に対応していることもわかります。
+
+機械語のプログラム自体は 17 バイトです。
+機械語のプログラム自体は 17 バイトですが、
+ELF 形式のファイルにはシンボルなどの情報も含まれているため計 484 バイトとなっています。
+~objdump~ コマンドを使って、
+オブジェクトファイル ~add.o~ に含まれているシンボルを見てみます。
+#+begin_src sh
+$ objdump -t add.o
+
+add.o:     file format elf32-i386
+
+SYMBOL TABLE:
+00000000 l    d  .text  00000000 .text
+00000000 l    d  .data  00000000 .data
+00000000 l    d  .bss   00000000 .bss
+00000000 g       .text  00000000 _start
+
+
+#+end_src
+.text、
+.data、
+.bss というセクション名以外には、
+~_start~ というシンボルが含まれていることがわかります。
+.text セクション (機械語のプログラムを格納しているセクション) は ~_start~ という名前のシンボルで開始する決まりになっています。
+
+*** リンカによる実行ファイルの作成
+
+オブジェクトファイルのままでは実行できないため、
+~ld~ コマンドでリンクすることによって実行ファイルを作成します。
+#+begin_src sh
+$ ld -o add add.o
+#+end_src
+UNIX には、
+プログラムの実行に成功したときには何も言わない (余計なメッセージを表示しない) という伝統があります。
+~ld~ コマンドもその伝統にのっとり余計なメッセージは表示しません。
+何も表示されませんが、
+実行ファイル ~add~ は正常に作成されています。
+#+begin_src sh
+$ ls -al add
+-rwxr-xr-x 1 asm asm 4548 Feb 18 18:22 add
+$ file add
+add: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), statically linked, not stripped
+#+end_src
+ELF 形式の実行ファイル (executable file) ~add~ ができています。
+ファイルサイズが ~add.o~ からさらに増えて 4 548 バイトになりました。
+「statically linked」と表示されているように、
+静的にリンクされています。
+このため、
+この 4 548 バイトの実行ファイルだけで動作します。
+他の共有ライブラリなどには依存していません。
+例えば、
+C 言語の標準ライブラリなどにも依存していません。
+
+では、
+実行ファイル ~add~ を実際に実行してみましょう。
+このプログラムは返り値 (プロセスの終了ステータス) として、
+12 + 34 の計算結果を返します。
+#+begin_src sh
+$ ./add
+$ echo $?
+46
+#+end_src
+~add~ プログラムを実行したあと、
+シェルの特殊パラメータ ~$?~ に格納されている値を表示しています。
+シェルの特殊パラメータ ~$?~ は、
+直前に実行したプロセスの終了ステータスを格納しています。
+プログラム ~add~ を実行したプロセスの終了ステータスが 46 (= 12 + 34) となっていることが確認できます。
+
+ソースコード ~add.s~ の中身を、
+もう少し詳しく見てみましょう。
+冒頭の
+#+begin_src asm
+        .global _start
+#+end_src
+は、
+~_start~ という大域的なシンボルを定義しています。
+これにより、
+外部のプログラムに対して、
+「~_start~ というシンボルの実体はここにあるのだ」ということを宣言しています。
+その直後の
+#+begin_src asm
+        .text
+#+end_src
+は、
+ここから *.text セクション* (機械語のプログラムを格納するセクション) を開始することをアセンブラに伝えています。
+~.global~ も .text も、
+ドット (~.~) から始まっているので、
+アセンブラに対する疑似命令 (ディレクティブ) です。
+
+その直後の
+#+begin_src asm
+_start:
+#+end_src
+は、
+ここが ~_start~ の本体であることを意味しています。
+末尾のコロン (~:~) は、
+これが *ラベル (label)* であることを意味しています。
+#+begin_src asm
+        movl    $12,%eax        # レジスタ EAX に 12 を格納
+        addl    $34,%eax        # レジスタ EAX に 34 を加える
+#+end_src
+は 12 + 34 を計算するプログラムです。
+まず、
+レジスタ EAX に *即値 (immediate value)* である 12 を格納しています。
+その後、
+レジスタ EAX に即値 34 を加えています。
+12、
+34 はどちらも 10 進数の値です。
+先頭の ~$~ は、
+これらの値が即値である (ラベルではない) ことを意味しています。
+
+最後の 3 行は Linux カーネルの ~exit~ *システムコール (system call)* を呼び出しています。
+#+begin_src asm
+        movl    %eax,%ebx       # レジスタ EAX の値をレジスタ EBX にコピー
+        movl    $1,%eax         # システムコール 2 番は exit
+        int     $0x80           # システムコール実行
+#+end_src
+Linux カーネルのシステムコールを呼び出すためには、
+1. レジスタ EAX に呼び出したいシステムコールの番号を格納し
+2. ~int 0x80~ によって 0x80 番のソフトウェア割り込みを発生させる
+という約束になっています。
+システムコール 1 番は ~exit~ (プロセスの実行を終了) です。
+~exit~ システムコールは、
+終了コードをレジスタ EBX で受け取るという約束になっています。
+このため、
+12 + 34 の計算結果をレジスタ EBX に格納しています。
+
+*** コンピュータにおける割り込みとは
+
+コンピュータにおける *割り込み (interrupt)* とは、
+何らかの処理を実行している CPU に対して、
+「ちょっと悪いけど、
+今すぐこの仕事やって!」と伝えることを意味します。
+一般的な CPU は、
+外部からの割り込みが発生すると、
+現在のプログラムの実行をいったん中断し、
+実行中のプログラムの状態を退避します。
+割り込みの種類に応じて別のプログラムを実行します。
+そのプログラムの実行が完了したら、
+退避していたプログラムの状態を復元し、
+元のプログラムの実行を再開します。
+
+割り込みは、
+「CPU が何らかの処理を実行しているときに、
+好きなタイミングで割り込む」のですから、
+当然、
+ソフトウェアだけでは実現できません。
+割り込みを利用するためには、
+CPU が割り込みのための機能を持っている必要があります。
+つまり、
+割り込みの機能を持っていない CPU では、
+どうがんばっても割り込みは実現できません。
+
+割り込みには、
+CPU 外部からの電気信号によって発生する *ハードウェア割り込み (hardware interrupt)* と、
+CPU 内部のソフトウェア処理によって割り込みが発生する *ソフトウェア割り込み (software interrupt)* の 2 種類があります。
+
+Linux カーネルは、
+ユーザプログラムから Linux カーネルに対する「あれをしてほしい、
+これをしてほしい」という要求を伝えるために、
+ソフトウェア割り込みを使っています。
+
+プログラムから、
+オペレーティングシステムの機能を呼び出す仕組みのことをシステムコール (system call) と呼びます。
+
+このあたりの関係を整理すると以下の通りです。
+- プログラムから、Linux カーネルの機能を呼び出す仕組みをシステムコール
+  と呼ぶ
+- Linux カーネルのシステムコールを呼び出すためにはソフトウェア割り込み
+  を使う約束になっている
+- Linux のシステムコール呼び出しには 0x80 番のソフトウェア割り込みを使
+  う約束になっている
+
+** アセンブリ言語プログラムの例
+<<sec:gas/example>>
+
+*** 条件分岐と文字列の表示
+
+アセンブリ言語で書かれたプログラムをもう一つ見てみましょう。
+以下のアセンブリ言語プログラムを ~cmp.s~ という名前で保存します。
+
+#+caption: gas/cmp.s
+#+label: fig:gas/cmp.s
+#+include: "code/gas/cmp.s" src asm
+
+このプログラムは、
+123 と 456 が等しいかをチェックし、
+等しければ「~equal~」、
+等しくなければ「~not equal~」と標準出力に表示します。
+123 と 456 は等しくないため、
+実行すると「~not equal~」と表示されます。
+
+#+begin_src sh
+$ as -o cmp.o cmp.s
+$ ld -o cmp cmp.o
+$ ./cmp
+not equal
+#+end_src
+
+プログラム ~cmp.s~ の中身を見てみましょう。
+#+begin_src asm
+	.global _start
+	.text
+_start:
+#+end_src
+~_start~ という名前のプログラムの始まりであることを意味します。
+~.global~ や ~.text~ などは GAS への疑似命令です。
+これらの意味については後ほど説明します。
+
+プログラムの本体は以下の部分です。
+#+begin_src asm
+	movl	$123, %eax     # EAX に 123 を格納
+	cmpl	$456, %eax     # EAX は 456 か？
+	je	L1             # もしそうなら L1 にジャンプ
+#+end_src
+レジスタ EAX に 123 を格納したあと、
+レジスタ EAX の値を 456 と比較しています。
+レジスタ EAX の値が 456 と一致すれば L1 にジャンプします。
+レジスタ EAX の値が 456 と一致しなければ、
+L1 にジャンプせず、
+そのまま次の命令に進みます。
+
+まず、
+レジスタ EAX の値が 456 と一致しなかった場合の処理です。
+#+begin_src asm
+	movl	$msg_neq, %ecx # ECX に msg_neq のアドレスを格納
+	movl	$10, %edx      # 10 文字
+	jmp	L2	       # L2 にジャンプ
+#+end_src
+レジスタ ECX に、
+ラベル ~msg_neq~ のアドレスを格納します。
+~msg_neq~ は、
+「~not eqaul\n~」という文字列を格納している番地を表します。
+文字列の長さをレジスタ EDX に格納し、
+ラベル ~L2~ にジャンプします。
+
+レジスタ EAX の値が 456 と一致した場合の処理です。
+#+begin_src asm
+L1:
+	movl	$msg_eq, %ecx  # ECX に msg_eq のアドレスを格納
+	movl	$6, %edx       # 6 文字
+#+end_src
+一致しなかった場合の処理とほぼ同様ですが、
+レジスタ ECX に格納する文字列のアドレスや、
+レジスタ EDX に格納する文字列の長さが異なります。
+
+レジスタ EAX の値が 456 と一致したか否かにかかわず、
+ラベル ~L2~ から合流します。
+#+begin_src asm
+L2:
+        movl    $4, %eax       # システムコール 4 番は write
+        movl    $1, %ebx       # 標準出力 (1)
+        int     $0x80          # システムコール呼び出し
+#+end_src
+ここでは、
+Linux カーネルの ~write~ システムコールを呼び出しています。
+~write~ システムコールは 4 番です。
+~exit~ システムコールと同様に、
+レジスタ EAX でシステムコール番号を指定します。
+~write~ システムコールでは、
+レジスタ EBX でファイルディスクリプタを、
+レジスタ ECX で文字列が格納されているアドレスを、
+レジスタ EDX で出力する文字列長を指定します。
+これにより、
+標準出力に ~not eqal~ という文字列が表示されます。
+
+最後は、
+先ほどのプログラム ~add.s~ と同じように、
+~exit~ システムコールを呼び出しています。
+#+begin_src asm
+        movl    $1,%eax        # 1 番は exit
+        int     $0x80          # システムコール呼び出し
+#+end_src
+
+ファイルの末尾には、
+GAS の疑似命令を使って文字列のデータを生成しています。
+#+begin_src asm
+        .data
+msg_eq: .ascii  "equal\n"
+msg_neq:.ascii  "not equal\n"
+#+end_src
+.data や .ascii などの疑似命令についても後ほど説明します。
+
+*** C 言語では書けないプログラムを書いてみる
+
+C 言語のような高級言語を一切使わずに、
+アセンブリ言語だけでプログラムを書くことができました。
+ただし、
+12 + 34 = 46 を計算するくらいなら、
+わざわざアセンブリ言語を覚える必要はありません。
+
+せっかくなので、
+「C 言語では書けないプログラム」を書いてみましょう。
+C 言語はもともと UNIX オペレーティングシステムを記述するために設計されたプログラミング言語です。
+このため、
+膨大な数のプログラミング言語が存在しますが、
+C 言語はそれらの言語の中でも、
+特にコンピュータのハードウェアに密着した言語です。
+「C 言語で書けない」プログラムであれば、
+普通の高級言語でもまず書けません。
+
+以下のアセンブリ言語で書かれたプログラムを ~cpuid.s~ というファイル名で保存します。
+
+#+caption: gas/cpuid.s
+#+label: fig:gas/cpuid.s
+#+include: "code/gas/cpuid.s" src asm
+
+cpuid と shrl という、
+これまで登場していないアセンブリ言語のニーモニックが登場しています。
+
+*** IA-32アーキテクチャの CPUID 命令とは
+
+これは、
+IA-32 アーキテクチャ固有の *CPUID (CPU IDentification) 命令* を実行するプログラムです。
+CPUID 命令とは、
+CPU の詳細な情報を取得するための命令です。
+CPUID 命令により、
+CPU のメーカ・種類・型番・機能などの情報を取得できます。
+IA-32 アーキテクチャに固有の命令です。
+他の命令セットアーキテクチャには存在しません (他のアーキテクチャの CPU にも、
+CPUID 命令と「同じような」命令を持っているものはあります)。
+
+CPUID 命令はレジスタ EAX に格納されている値に応じて取得できる情報が変化します。
+上の例では、
+レジスタ EAX に 1 を設定しています。
+レジスタ EAX が 1 の場合、
+CPUID 命令を実行すると、
+CPU の情報や機能がレジスタ EAX、
+EBX、
+ECX、
+EDX に格納されます。
+
+~exit~ システムコールの終了ステータスは 0〜255 の 8 ビットの値しか返せません。
+このため、
+ここではレジスタ EDX に格納されている値のうち、
+上位 8 ビットの値を終了ステータスとして返しています。
+ソースコード ~cpuid.s~ をアセンブルして実行してみましょう。
+アセンブルおよび実行の手順は先ほどの ~add.c~ と同じです。
+#+begin_src sh
+$ as -o cpuid.o cpuid.s
+$ ld -o cpuid cpuid.o
+$ ./cpuid
+$ echo $?
+23
+#+end_src
+23 という値が取得できました。
+CPUID 命令によって取得した、
+レジスタ EDX の値の上位 8 ビットが 23 (2 進数で 0b00010111) であったことを意味します。
+
+レジスタ EAX の値が 1 のとき、
+CPUID 命令は、
+レジスタ ECX およびレジスタ EDX に、
+それぞれ CPU の拡張機能情報および機能情報を表すビット列を返します。
+例えば、
+レジスタ EDX の各ビットは、
+CPU が以下のような機能を持っているか否かを表します。
+
+| ビット | 略称   | 機能                               |
+|--------+--------+------------------------------------|
+|      0 | FPU    | x87 オンチップ FPU                 |
+|      1 | VME    | 仮想 8086 モード強化               |
+|      2 | DE     | デバッグ拡張                       |
+|      3 | PSE    | ページサイズ拡張                   |
+|      4 | TSC    | タイム・スタンプ・カウンタ         |
+|      5 | MSR    | RDMSR および WRMSR のサポート      |
+|      6 | PAE    | 物理アドレス拡張                   |
+|      7 | MCE    | マシンチェック例外                 |
+|      8 | CX8    | CMPXCHG8B 命令                     |
+|      9 | APIC   | オンチップ APIC                    |
+|     11 | SEP    | SYSENTER および SYSEXIT            |
+|     12 | MTRR   | メモリタイプおよび範囲レジスタ     |
+|     13 | PGE    | PTE グローバルビット               |
+|     14 | MCA    | マシン・チェック・アーキテクチャ   |
+|     15 | CMOV   | 条件付き転送/比較命令              |
+|     16 | PAT    | ページ属性テーブル                 |
+|     17 | PSE-36 | ページサイズ拡張                   |
+|     18 | PSN    | プロセッサ・シリアル番号           |
+|     19 | CLFSH  | CFLUSH 命令                        |
+|     21 | DS     | デバッグストア                     |
+|     22 | ACPI   | 温度モニタおよびクロック制御       |
+|     23 | MMX    | MMX テクノロジ                     |
+|     24 | FXSR   | FXSAVE/FXRSTOR                     |
+|     25 | SSE    | SSE 拡張命令                       |
+|     26 | SSE2   | SSE2 拡張命令                      |
+|     27 | SS     | セルフスヌープ                     |
+|     28 | HTT    | ハイパー・スレッド・テクノロジ     |
+|     29 | TM     | 温度モニタ                         |
+|     31 | PBE    | ペンディング・ブレーク・イネーブル |
+
+よくわからない専門用語ばかりですが、
+細かいことは気にしなくてかまいません。
+「CPUID 命令を実行すると、
+今動いている CPU のいろんな情報が取れる」と理解しておいてください。
+#+begin_comment
+上の表の中では、
+|     23 | MMX    | MMX テクノロジ                     |
+|     25 | SSE    | SSE 拡張命令                       |
+|     26 | SSE2   | SSE2 拡張命令                      |
+あたりの用語は見たことがあるかもしれません。
+これらは、
+SIMD (Single Instruction, Multiple Data) と呼ばれる、
+単一の命令で複数のデータを処理できる命令の有無を表しています。
+MMX、
+SSE、
+SSE2 は、
+いずれも IA-32 アーキテクチャにおける SIMD 命令セットです。
+非常に大ざっぱに説明すると、
+MMX は整数演算の SIMD 命令セット、
+SSE は浮動小数点演算の SIMD 命令セット、
+SSE2 は整数も浮動小数点も両方扱える SIMD 命令セットだといえます。
+
+先ほどの ~cpuid~ プログラムの話に戻りましょう。
+#+end_comment
+
+~cpuid~ プログラムの実行結果は 23 (2 進数で 0b00010111) でした。
+~cpuid~ プログラムでは、
+レジスタ EDX の上位 8 ビットを取得していました。
+したがって、
+レジスタ EDX の上位 8 ビットが 0b00010111 なので、
+今回使用したコンピュータの CPU は、
+
+|--------+------+------------------------------------+------|
+| ビット | 略称 | 機能                               | 有無 |
+|--------+------+------------------------------------+------|
+|     24 | FXSR | FXSAVE/FXRSTOR                     | あり |
+|     25 | SSE  | SSE 拡張命令                       | あり |
+|     26 | SSE2 | SSE2 拡張命令                      | あり |
+|     27 | SS   | セルフスヌープ                     | なし |
+|     28 | HTT  | ハイパー・スレッド・テクノロジ     | あり |
+|     29 | TM   | 温度モニタ                         | なし |
+|     30 |      |                                    | なし |
+|     31 | PBE  | ペンディング・ブレーク・イネーブル | なし |
+|--------+------+------------------------------------+------|
+
+であることがわかります。
+
+このようにアセンブリ言語を使えば、
+CPU やハードウェアの機能を最大限に引き出すプログラムを書くことができます。
+
+** C 言語で任意の機械語プログラムを実行する方法
+<<sec:gas/with-c>>
+
+*** 機械語のプログラムを C 言語で記述する方法
+
+CPUID 命令を実行するプログラムは、
+「C 言語では書けないプログラム」であると説明しました。
+C 言語を普通に使う限りは、
+どうやっても CPUID 命令を呼び出せません。
+しかし、
+技術的には、
+C 言語と C コンパイラだけを使って CPUID 命令を実行するプログラムを書くことは不可能ではありません。
+
+少し細かな話になりますが、
+コンピュータの理解にもつながるテーマでもあるので、
+その方法を紹介しておきましょう。
+
+[[sec:cpu/computer]] 節で述べたように、
+現在のコンピュータはフォン・ノイマン・アーキテクチャにもとづいています。
+そして、
+フォン・ノイマン・アーキテクチャはプログラム内蔵型コンピュータでした。
+プログラムとデータが、
+どちらもコンピュータのメモリ内に格納されています。
+
+ここで、
+先ほどの ~cpuid~ プログラムを逆アセンブルしてみます。
+#+begin_src raw
+$ objdump -d cpuid
+
+cpuid:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+08049000 <_start>:
+ 8049000:       b8 01 00 00 00          mov    $0x1,%eax
+ 8049005:       0f a2                   cpuid
+ 8049007:       89 d3                   mov    %edx,%ebx
+ 8049009:       c1 eb 18                shr    $0x18,%ebx
+ 804900c:       b8 01 00 00 00          mov    $0x1,%eax
+ 8049011:       cd 80                   int    $0x80
+#+end_src
+プログラム自体は
+#+begin_src raw
+b8 01 00 00 00 0f a2 89  d3 c1 eb 18 b8 01 00 00 00 cd 80
+#+end_src
+という、
+たったの 19 バイトです。
+CPU は、
+メモリ上に格納されているプログラムを順番に読み込んで、
+1 命令ずつ順番に実行するのでした。
+
+したがって、
+- 上記の 19 バイトの機械語のプログラムをメモリ上のどこかに配置する
+- CPU のプログラムカウンタの値を、配置したメモリのアドレスに変更する
+ということができれば CPUID 命令を実行するプログラムが動かせます。
+
+19 バイトをメモリ上に配置するのは簡単です。
+19 バイト分の ~unsigned char~ の配列を確保するだけです。
+#+begin_src C
+unsigned char cpuid_code[19] = {0xb8, 0x01, 0x00, 0x00, 0x00, 0x0f, 0xa2, 0x89, 0xd3, 0xc1, 0xeb, 0x18, 0xb8, 0x01, 0x00, 0x00, 0x00, 0xcd, 0x80};
+#+end_src
+
+*** 機械語のプログラムを C 言語から実行する方法 (スタックを利用)
+
+あとは、
+プログラムカウンタの値を ~cpuid_code~ が差すアドレスに変更するだけです。
+C 言語から CPU のプログラムカウンタを直接変更することはできませんが、
+「C 言語は関数呼び出しにスタックフレームを使う」という特性を利用すれば実現できます。
+機械語によるサブルーチン呼び出しは [[sec:stack/funcall]] 節で説明したような方法を使います。
+C 言語における関数呼び出しも、
+これと同じようにスタックを利用して関数呼び出しを実現しています。
+
+つまり、
+C 言語でも、
+「呼び出された関数」から「呼び出し元の関数」に戻る場合には、
+スタック上に積まれたリターンアドレスを使って戻ります。
+具体的な実現手順は CPU や処理系 (C コンパイラ) に依存しますが、
+IA-32 アーキテクチャ上の C コンパイラであれば、
+普通はスタック上に積まれたリターンアドレスを使います。
+
+以上の考え方を C 言語のプログラムとして実装します。
+
+#+caption: gas/c-cpuid.c
+#+label: fig:gas/c-cpuid.c
+#+include: "code/gas/c-cpuid.c" src C
+
+実際に実行してみましょう。
+#+begin_src sh
+$ gcc -fno-pic -o c-cpuid c-cpuid.c
+$ ./c-cpuid
+$ echo $?
+23
+#+end_src
+アセンブリ言語で書いたプログラム ~cpuid~ と同じ実行結果が得られました!
+
+C 言語で書かれたプログラム ~c-cpuid.s~ で核となるのは、
+#+begin_src C
+  *(unsigned int *) (cpuid_code + 23) = (unsigned int)cpuid_code;
+#+end_src
+という行です。
+このコードは、
+~unsigned char~ 型の配列 ~cpuid_code~ の 4 バイト後ろに、
+配列 ~cpuid_code~ の先頭のアドレスを書き込んでいます (図 [[fig:gas/cpuid]])。
+これは、
+- C 言語において、関数内で宣言された自動変数はスタック上に確保される
+- IA-32 アーキテクチャのスタックは上に (アドレスが減る方向に) 伸びる
+- その結果、~cpuid_code~ の配列、フレームポインタ、リターンアドレスの
+  順にスタックに積まれる
+という性質を利用しています。
+つまり、
+「スタック上に確保されている配列 ~cpuid_code~ の先頭アドレスの 23 バイト後に、
+~main~ 関数からのリターンアドレスが格納されている」という性質を利用しています。
+
+#+caption: リターンアドレスを書き換える直前のスタックの状態
+#+label: fig:gas/cpuid
+[[./figure/gas/cpuid.png]]
+
+普通は、
+C 言語でこんな技巧的なプログラムを書く必要はありません。
+また、
+このプログラムは CPU のアーキテクチャだけでなく、
+C コンパイラが生成するコードの内容に依存したプログラムになっています。
+したがって、
+C コンパイラのバージョンや、
+C コンパイラのコンパイル時オプションなどが変わっただけですぐに動かなくなってしまいます。
+
+ただし、上記の例を通して、
+- フォン・ノイマン・アーキテクチャとはどのようなものか
+- プログラム内蔵型コンピュータとはどのようなものか
+- C 言語は、高級言語であるにもかかわらず、いかにコンピュータのハードウェ
+  アに密接に関連しているか
+- C 言語で書いたプログラムが、すぐに不正なメモリアクセスで異常終了する
+  のはなぜか
+などの理解が深まったのではないでしょうか。
+
+セキュリティホールとしてよく話題になる、
+*バッファオーバーフロー攻撃 (buffer overflow attack)* も、
+ここで紹介した考え方を利用しています。
+C 言語で少し工夫 (細工?)
+すれば、
+任意の機械語のプログラムが実行できてしまいます。
+同じように、
+C 言語で書かれたプログラムに対する入力に細工すれば、
+外部の攻撃者が任意の機械語のプログラムを実行できてしまうのです。
+
+*** 機械語のプログラムを C 言語から実行する方法 (プログラム本体の書き換え)
+
+なお、
+スタックに格納されているリターンアドレスに苦労して細工するのではなく、
+「C 言語では関数ポインタが取得できるので、
+関数の中身を直接書き換えるほうが簡単では?」
+と思うかもしれません。
+
+C 言語で関数ポインタによって、
+関数が格納されているメモリのアドレスを取得できます。
+このため、
+1. 中身を書き換えるための関数 ~exec_cpuid~ を事前に用意しておく (コン
+   パイルされた状態で 19 バイト以上あれば中身は何でもかまわない)
+2. 関数ポインタとして ~exec_cpuid~ の開始アドレスを取得する
+3. 関数 ~exec_cpuid~ の先頭アドレスから 19 バイトに機械語のプログラム
+   を書き込む
+4. 関数 ~exec_cpuid~ を呼び出す
+とすれば実現できそうです。
+
+上記の考え方を C 言語のプログラムとして実装します。
+
+#+caption: gas/c-cpuid-funcptr.c
+#+label: fig:gas/c-cpuid-funcptr.c
+#+include: "code/gas/c-cpuid-funcptr.c" src C
+
+考え方としてはほぼバッチリなのですが、
+残念ながらこの方法ではうまくいきません。
+~c-cpuid-funcptr.c~ をコンパイルして実行してみます。
+#+begin_src sh
+$ gcc -g -fno-pic -o c-cpuid-funcptr c-cpuid-funcptr.c
+$ ./c-cpuid-funcptr
+Segmentation fault
+#+end_src
+セグメント違反 (不正なメモリアクセス) が発生し、
+Linux カーネルによってプロセスが強制的に停止されてしまいました。
+
+プログラムのどの部分でセグメント違反が発生したのでしょうか?
+デバッガの監視下でプログラム ~c-cpuid-funcptr~ を実行します。
+#+begin_src sh
+$ gdb -q c-cpuid-funcptr
+Reading symbols from c-cpuid-funcptr...done.
+(gdb) r		← r (run) コマンドでプログラムの実行を開始
+Starting program: /home/asm/code/gas/c-cpuid-funcptr
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00401218 in main (argc=1, argv=0xbffffb54) at c-cpuid-funcptr.c:24
+24          *((unsigned char *)exec_cpuid + i) = cpuid_code[i];
+(gdb)
+#+end_src
+デバッガがセグメント違反のシグナルを捉え、
+セグメント違反を起こした C 言語のプログラムの該当箇所を表示してくれます。
+関数 ~exec_cpuid~ の先頭アドレスから機械語のプログラムを書き込もうとして失敗しています。
+
+これは、
+機械語のプログラムが格納されているメモリ領域 (.text セクション) が *書き込み禁止になっている* からです。
+フォン・ノイマン・アーキテクチャにはメモリの保護機能はありません。
+現在のコンピュータは、
+オペレーティングシステムの管理下で、
+アプリケーションプログラムを安全に動かすためにメモリの保護機能を持っています。
+通常、
+プログラムが格納されている .text セクションは書き換える必要がないため、
+オペレーティングシステムによってメモリの書き換えが禁止されています。
+
+上記のプログラム ~c-cpuid-funcptr~ では、
+関数 ~exec_cpuid~ の機械語のプログラムが格納されているメモリ領域に書き込もうとしてセグメント違反が発生しました。
+
+したがって、
+メモリの保護機能がないコンピュータや、
+メモリの保護機能があるコンピュータであってもそれを使用しないオペレーティングシステムであれば上記の方法は期待どおりに動作します。
+
+** GNU アセンブラ (GAS) とは
+<<sec:gas/gas>>
+
+GAS は、
+もともと、
+C コンパイラの裏方 (バックエンド) で動作するアセンブラとして設計されました。
+C コンパイラは C 言語で書かれたプログラムをコンパイルし、
+アセンブリ言語のプログラムを生成します。
+GAS は、
+C コンパイラが生成したアセンブリ言語のプログラムを機械語に変換します。
+
+もちろん、
+C 言語を使わずに、
+アセンブリ言語のプログラムをゼロから書くことも可能です。
+アセンブリ言語のプログラムを GAS を使ってアセンブルすることにより、
+実行ファイルを作成することもできます。
+
+C 言語の仕様は *ANSI (American National Standards Institute)* や *ISO (International Organization for standardization)* で標準化が行われています。
+C 言語の仕様は、
+C89、
+C90、
+C95、
+C99、
+C11、
+C17 などと呼ばれています。
+例えば、
+1989 年に策定された仕様が C89 (正式名称は ANSI X3.159-1989)、
+1999 年に策定された仕様が C99 (正式名称は ISO/IEC 9899:1999) です。
+C 言語の仕様は標準化されているので、
+通常、
+C 言語で書かれたソースコードは、
+どんな C コンパイラでもコンパイルできます。
+C99 の C 言語で書かれたソースコードは、
+C99 に対応したどんな C コンパイラでもコンパイルできます。
+
+一方、
+アセンブラの仕様は標準化されていません。
+このため、
+アセンブリ言語の文法や仕様は、
+アセンブラごとにまちまちです。
+このため、
+あるアセンブラ向けに書かれたアセンブリ言語プログラムは、
+通常は、
+他のアセンブラではアセンブルできません。
+
+例えば、
+IA-32 アーキテクチャ向けのアセンブラとしては、
+GNU プロジェクトの GAS と *Microsoft MASM (Microsoft Macro Assembler)* が広く使われています。
+GAS も MASM も、
+どちらも「アセンブラ」であり、
+ある意味ではそっくりです。
+どちらも、
+各行に機械語の命令に対応するニーモニックやオペランドが書かれています。
+ただし、
+細かく見てゆくと、
+アセンブリ言語でのプログラムの記述方法はかなり異なっています。
+このため、
+例えば、
+GAS に習熟していれば、
+MASM のアセンブリ言語で書かれたプログラムは何となく読めます。
+ただし、
+GAS に習熟していても、
+MASM のアセンブリ言語でプログラムを書くのは困難です。
+MASM のアセンブリ言語でプログラムを書くためには、
+MASM の文法や疑似命令 (ディレクティブ) などを一通り学ぶ必要があります。
+
+幸いなことに、
+現在はそれほど多数のアセンブラが乱立している状況ではありません。
+また、
+GAS は多数のアーキテクチャをサポートしています。
+2021/2/4 時点で、
+GAS は以下の CPU をサポートしています。
+- ARC (Argonaut RIS Core)
+- Adapteva EPIPHANY
+- Altera Nios II
+- Analog Devices Blackfin
+- Andes Technology NDS32
+- Apple-IBM-Motorola PowerPC
+- Arm AArch64 (64-bit ARM)
+- Arm ARM
+- Atmel AVR
+- Axis Communications ETRAX CRIS (Ethernet, Token Ring, AXis - Code Reduced Instruction Set)
+- C-SKY Microsystems C-SKY
+- CRX
+- DEC (Digital Equipment Corporation) Alpha AXP
+- DEC (Digital Equipment Corporation) PDP-11
+- DEC (Digital Equipment Corporation) VAX
+- DLX
+- Don Knuth's MMIX
+- FT32
+- Freescale S12Z
+- Freescale XGATE
+- Fujitsu FR30
+- Fujitsu FRV
+- HP/Intel IA-64 (Intel Itanium architecture)
+- Helwett-Packard PA-RISC (Precision Architecture)
+- IBM Synergistic Processing Unit (SPU)
+- IBM System/390
+- Imagination Technologies Meta
+- Infineon XC16X
+- Intel 80386, AMD x86-64
+- Lattice Semiconductor LatticeMico32
+- Linux eBPF (extended Berkeley Packet Filter)
+- M*Core
+- MIPS アーキテクチャ
+- MOXIE
+- Matsushita 10200
+- Matsushita 10300
+- Mitsubishi D10V
+- Mitsubishi D30V
+- Morpho Technologies MT
+- Motorola 68HC11 & 68HC12
+- Motorola m68k (68000 ファミリ)
+- NEC V850
+- National Semiconductor CR16
+- National Semiconductor NS32000 (32k) シリーズ
+- OpenRISC ファミリ
+- Pico Java
+- RISC-V
+- Renesas / SuperH (SH)
+- Renesas H8/300
+- Renesas M32C
+- Renesas M32R
+- Renesas RL78
+- Renesas RX
+- Sanyo XSTORMY16
+- Scenix IP2xxx
+- Score
+- Sitera IQ2000
+- Sun Microsystems SPARC (Scalable Processor Architecture)
+- Texas Instruments MSP430
+- Texas Instruments PRU I/O コア
+- Texas Instruments TMS320C30
+- Texas Instruments TMS320C3x, TMS320C4x
+- Texas Instruments TMS320C54X
+- Texas Instruments TMS320C6X
+- Tilera TILEPro
+- Tilera Tile-Gx
+- Toshiba Media Processor
+- Visium
+- WebAssembly
+- Xilinx MicroBlaze
+- Xtensa instructions
+- Zilog Z80, Z180, EZ80 and ASCII R800
+- Zilog Z800n
+このように、
+GAS は非常に汎用性の高いアセンブラです。
+GAS を習得すれば、
+いろいろなコンピュータで利用できます。
+
+なお、
+上のリストに含まれているものの大部分はハードウェアの CPU ですが、
+一部、
+CPU でないものも含まれています。
+例えば、
+Analog Devices Blackfin は DSP (Digital Signal Processor) ですし、
+Linux eBPF は仮想計算機です。
+
+#+begin_note
+原稿執筆時の最新版の binutils のソースコードから GAS がサポートしているターゲット CPU の情報を抽出しようとしましたが、
+一覧が見つからなかったため、
+GAS のソースコード中のコメントをもとにリストを作成しました。
+GAS は自由ソフトウェアなので、
+不明な点があればこのようにソースコードを見て確認できます。
+
+binutils のソースコードは git から取得できます。
+#+begin_src raw
+$ git clone git://sourceware.org/git/binutils-gdb.git
+Cloning into 'binutils-gdb'...
+remote: Enumerating objects: 39038, done.
+remote: Counting objects: 100% (39038/39038), done.
+remote: Compressing objects: 100% (37583/37583), done.
+remote: Total 1043850 (delta 4309), reused 1883 (delta 1424), pack-reused 1004812
+Receiving objects: 100% (1043850/1043850), 372.88 MiB | 1.33 MiB/s, done.
+Resolving deltas: 100% (861529/861529), done.
+Checking out files: 100% (35799/35799), done.
+#+end_src
+
+binutils のアーカイブ中の ~gas/config~ ディレクトリに、
+GAS がサポートしている CPU ごとの情報が格納されています。
+~gas/config/tc-*.c~ というファイルが CPU ごとのアセンブラの本体のようです。
+~gas/config/tc-*.c~ というファイルの冒頭のコメントをすべて抽出します。
+#+begin_src raw
+$ head -1 -q binutils-gdb/gas/config/tc-*.c
+/* tc-aarch64.c -- Assemble for the AArch64 ISA
+/* tc-alpha.c - Processor-specific code for the DEC Alpha AXP CPU.
+/* tc-arc.c -- Assembler for the ARC
+/* tc-arm.c -- Assemble for the ARM
+/* tc-avr.c -- Assembler code for the ATMEL AVR
+/* tc-bfin.c -- Assembler for the ADI Blackfin.
+/* tc-bpf.c -- Assembler for the Linux eBPF.
+/* tc-cr16.c -- Assembler code for the CR16 CPU core.
+/* tc-cris.c -- Assembler code for the CRIS CPU core.
+/* tc-crx.c -- Assembler code for the CRX CPU core.
+/* tc-csky.c -- Assembler for C-SKY
+/* tc-d10v.c -- Assembler code for the Mitsubishi D10V
+/* tc-d30v.c -- Assembler code for the Mitsubishi D30V
+/* tc-dlx.c -- Assemble for the DLX
+/* tc-epiphany.c -- Assembler for the Adapteva EPIPHANY
+/* tc-fr30.c -- Assembler for the Fujitsu FR30.
+/* tc-frv.c -- Assembler for the Fujitsu FRV.
+/* tc-ft32.c -- Assemble code for ft32
+/* This file is tc-generic.c
+/* tc-h8300.c -- Assemble code for the Renesas H8/300
+/* tc-hppa.c -- Assemble for the PA
+/* tc-i386.c -- Assemble Intel syntax code for ix86/x86-64
+/* tc-i386.c -- Assemble code for the Intel 80386
+/* tc-ia64.c -- Assembler for the HP/Intel IA-64 architecture.
+/* tc-ip2k.c -- Assembler for the Scenix IP2xxx.
+/* tc-iq2000.c -- Assembler for the Sitera IQ2000.
+/* tc-lm32.c - Lattice Mico32 assembler.
+/* tc-m32c.c -- Assembler for the Renesas M32C.
+/* tc-m32r.c -- Assembler for the Renesas M32R.
+/* tc-m68hc11.c -- Assembler code for the Motorola 68HC11 & 68HC12.
+/* tc-m68k.c -- Assemble for the m68k family
+/* tc-mcore.c -- Assemble code for M*Core
+/* tc-mep.c -- Assembler for the Toshiba Media Processor.
+/* tc-metag.c -- Assembler for the Imagination Technologies Meta.
+/* tc-microblaze.c -- Assemble code for Xilinx MicroBlaze
+/* tc-mips.c -- assemble code for a MIPS chip.
+/* tc-mmix.c -- Assembler for Don Knuth's MMIX.
+/* tc-mn10200.c -- Assembler code for the Matsushita 10200
+/* tc-mn10300.c -- Assembler code for the Matsushita 10300
+/* tc-moxie.c -- Assemble code for moxie
+/* tc-msp430.c -- Assembler code for the Texas Instruments MSP430
+/* tc-mt.c -- Assembler for the Morpho Technologies mt .
+/* tc-nds32.c -- Assemble for the nds32
+/* Altera Nios II assembler.
+/* ns32k.c  -- Assemble on the National Semiconductor 32k series
+/* tc-or1k.c -- Assembler for the OpenRISC family.
+/* tc-pdp11.c - pdp11-specific -
+/* tc-pj.c -- Assemble code for Pico Java
+/* tc-ppc.c -- Assemble for the PowerPC or POWER (RS/6000)
+/* TI PRU assembler.
+/* tc-riscv.c -- RISC-V assembler
+/* tc-rl78.c -- Assembler for the Renesas RL78
+/* tc-rx.c -- Assembler for the Renesas RX
+/* tc-s12z.c -- Assembler code for the Freescale S12Z
+/* tc-s390.c -- Assemble for the S390
+/* tc-score.c -- Assembler for Score
+/* tc-score7.c -- Assembler for Score7
+/* tc-sh.c -- Assemble code for the Renesas / SuperH SH
+/* tc-sparc.c -- Assemble for the SPARC
+/* spu.c -- Assembler for the IBM Synergistic Processing Unit (SPU)
+/* tc-tic4x.c -- Assemble for the Texas Instruments TMS320C[34]x.
+/* TI C6X assembler.
+/* tc-c30.c -- Assembly code for the Texas Instruments TMS320C30
+/* tc-tic54x.c -- Assembly code for the Texas Instruments TMS320C54X
+/* tc-tilegx.c -- Assemble for a Tile-Gx chip.
+/* tc-tilepro.c -- Assemble for a TILEPro chip.
+/* tc-v850.c -- Assembler code for the NEC V850
+/* tc-vax.c - vax-specific -
+/* This is the machine dependent code of the Visium Assembler.
+/* tc-wasm32.c -- Assembler code for the wasm32 target.
+/* tc-xc16x.c -- Assembler for the Infineon XC16X.
+/* tc-xgate.c -- Assembler code for Freescale XGATE
+/* tc-xstormy16.c -- Assembler for the Sanyo XSTORMY16.
+/* tc-xtensa.c -- Assemble Xtensa instructions.
+/* tc-z8k.c -- Assemble code for the Zilog Z800n
+/* tc-z80.c -- Assemble code for the Zilog Z80, Z180, EZ80 and ASCII R800
+#+end_src
+このリストと、
+binutils のドキュメントをもとに、
+CPU の正式名称や製造元の情報を調査して、
+先ほどのリストを作成しました。
+#+end_note
+
+** GAS の文法
+<<sec:gas/syntax>>
+
+*** スペースとタブ
+
+GAS が解釈するアセンブリ言語プログラムの例を示します (図 [[fig:gas/add.s]])。
+[[sec:asm/c-to-machine]] 節の ~add.s~ と同じプログラムです。
+
+#+caption: gas/add.s
+#+label: fig:gas/add.s
+#+include: "code/gas/add.s" src asm
+
+スペース (space) とタブ (tab) は *空白文字 (white space)* です。
+GAS は、
+スペースとタブの並びを単一の空白文字として扱います。
+GAS では、
+スペースとタブを区別しませんし、
+アセンブリ言語のプログラム中のインデントにも特別な意味がないことに注意してください。
+
+アセンブリ言語では、
+タブを利用してインデントをそろえるのが一般的です。
+GCC が生成するアセンブリ言語のプログラムも、
+以下のようにキレイにインデントがそろっています。
+#+begin_src asm
+        movl    i, %eax
+        addl    $5678, %eax
+        movl    %eax, i
+#+end_src
+ただし、
+スペースとタブは特別な意味を持たないため、
+#+begin_src asm
+movl i,%eax
+     addl      $5678,    %eax
+               movl      %eax, i
+#+end_src
+のように書いても同じ意味になります。
+
+*** コメント
+
+GAS は 2 種類のコメントをサポートしています。
+1 つは、
+C 言語と同じような複数行にまたがるコメントです。
+#+begin_src asm
+	/* ブロック型のコメントの例です。
+	複数行にまたがったコメントを書くことができます。 */
+        movl    i, %eax
+        addl    $5678, %eax
+        movl    %eax, i
+#+end_src
+~/*~ から始まり、
+~*/~ で終わる部分がコメントになります。
+GAS はコメントを単一の空白文字として扱います。
+
+もう 1 つは、
+行単位のコメントです。
+#+begin_src asm
+	movl    i, %eax		# ここはコメントです
+        addl    $5678, %eax	# ここもコメントです
+        movl    %eax, i
+#+end_src
+*コメント開始文字* (~#~ や ~;~ など) から行末までがコメントになります。
+面白いことに、
+コメント開始文字は対象となるコンピュータごとに異なります。
+GAS は多数のアーキテクチャをサポートしており、
+コメント文字は対象とするコンピュータによって決まります。
+本書で扱っているアーキテクチャにおけるコメント開始文字と行の区切り文字を以下に示します (行の区切り文字については後述します)。
+
+| 対象となるシステム | コメント開始 | 行の区切り |
+|--------------------+--------------+------------|
+| Intel IA-32 (i386) | ~#~          | ~;~        |
+| ARM (arm)          | ~@~          | ~;~        |
+| ARM (aarch64)      | ~//~         | ~;~        |
+| Atmel AVR (avr)    | ~;~          | ~$~        |
+
+*** シンボル
+
+以下では、
+GAS の基本的な文法を説明します。
+コメント開始文字と同じように、
+詳細は対象となるコンピュータによって一部異なります。
+対象となるコンピュータごとの GAS の用法の違いについては GAS のドキュメントを参照してください。
+
+先ほどの ~add.s~ の例では、
+#+begin_src asm
+        .globl  main
+        .type   main, @function
+main:
+.LFB0:
+        .cfi_startproc
+        movl    i, %eax
+#+end_src
+中の ~main~、
+~.LFB0~、
+~i~ は *シンボル (symbol)* です。
+GAS では、
+シンボルに利用できる文字は、
+英字 (大文字・小文字)、
+数字、
+ごく一部の記号 (~_~、
+~.~、
+~$~ のみ) です。
+シンボルを数字で始めることはできません。
+大文字・小文字は区別されます。
+シンボルの長さには制限がありません。
+なお、
+シンボルに ~$~ が利用できるかどうかは、
+対象となるコンピュータによります。
+
+~L~ や ~.L~ から始まるシンボルは *局所シンボル (local symbol)* です。
+局所シンボルはアセンブラがオブジェクトコードの生成に使用しますが、
+オブジェクトファイル中には記録されません。
+局所シンボルに何が使われるかも対象となるコンピュータによって異なります。
+
+あまり利用する機会はないかもしれませんが、
+GAS はダブルクォート (~"~) で囲むことにより、
+任意の文字をシンボルに使用できます。
+通常、
+シンボルには英字・数字・ごく一部の記号のみが使用できます。
+ダブルクォートで囲んだ任意の文字列もラベルとして使用できます。
+例えば、
+以下のようにラベルに漢字や空白を含めることもできます。
+#+begin_src asm
+        .globl  "大事な関数"
+        .type   "大事な関数", @function
+"大事な関数":
+.LFB0:
+        .cfi_startproc
+        movl    "変数 i を格納しているアドレス", %eax
+#+end_src
+上の例では、
+「~大事な関数~」も「~変数 i を格納しているアドレス~」もシンボルです。
+
+*** 文
+
+アセンブリ言語のプログラムは *文 (statement)* で構成されます。
+通常、
+改行 (newline) で区切られた、
+各行が GAS の文に相当します。
+GAS では、
+文末の改行文字は必須です。
+このため、
+ファイルの末尾に改行がないとエラーになります。
+
+対象となるコンピュータによっては、
+特定の文字が行の区切りを意味します。
+IA-32 アーキテクチャでは、
+セミコロン (~;~) は行の区切りを意味します。
+他のコンピュータでは、
+セミコロン (~;~) はコメント開始文字の場合もあるので注意してください。
+
+なお、
+読みづらいためおすすめしませんが、
+IA-32 アーキテクチャでは
+#+begin_src asm
+movl i, %eax; addl $5678, %eax; movl %eax, i
+#+end_src
+のように 1 行に複数の文を書くこともできます。
+
+*** ラベル
+
+それぞれの文には 0 個以上の *ラベル (label)* を指定できます。
+ラベルは末尾に (空白を入れずに) コロン (~:~) を付与します。
+
+ラベルの例をいくつか示します。
+まずはラベルだけを含む文です。
+#+begin_src asm
+main:
+#+end_src
+~main~ という名前のラベルです。
+~main~ 直後のセミコロン (~:~) がラベルであることを表しています。
+
+ラベルと命令を同じ文に書くこともできます。
+#+begin_src asm
+main:	movl	i, %eax
+#+end_src
+
+GAS では、
+複数のラベルを単一の文に書くこともできます。
+#+begin_src asm
+main: proc_start: .LFB0: movl	i, %eax
+#+end_src
+この場合、
+~main~、
+~proc_start~、
+~.LFB0~ は同じアドレスを差します。
+
+*** 局所ラベル
+
+上で説明したように、
+GAS における局所シンボルとは ~L~ や ~.L~ から始まるシンボルでした。
+局所シンボルと名前が似ていますが、
+また別の機能に *局所ラベル (local label)* があります。
+
+アセンブリ言語によるプログラミングでは、
+プログラム中に多数のラベルを定義します。
+前述のように、
+ラベルには英字・数字・ごく一部の記号が利用でき、
+ラベルの長さには制限がありません。
+そのため、
+うまく工夫すれば、
+多数のそれぞれのラベルに異なる名前を付けられます。
+しかしこれは逆に言えば、
+うまく工夫しないと簡単にラベルが衝突してしまう、
+ということを意味します。
+
+[[sec:gas/example]] 節で紹介したアセンブリ言語のプログラム ~cmp.s~ (図 [[fig:gas/cmp.s]]) を例に挙げて説明します。
+このプログラム中に、
+以下のような箇所がありました。
+#+begin_src asm
+        cmpl    $456, %eax     # EAX は 456 か？
+        je      L1             # もしそうなら L1 にジャンプ
+        movl    $msg_neq, %ecx # ECX に msg_neq のアドレスを格納
+        movl    $10, %edx      # 10 文字
+        jmp     L2             # L2 にジャンプ
+L1:
+        movl    $msg_eq, %ecx  # ECX に msg_eq のアドレスを格納
+        movl    $6, %edx       # 6 文字
+L2:
+#+end_src
+比較演算命令 ~cmpl~ の結果によって処理を変えるために、
+~L1~ および ~L2~ というラベルを定義しています。
+上の例では条件分岐が 1 カ所だけなので、
+ラベルは ~L1~ と ~L2~ の 2 個で済みました。
+しかし、
+1 つの条件分岐につき 2 つのラベルが必要です。
+このため、
+例えば、
+プログラム中に条件分岐が 100 カ所あれば、
+200 個のラベルが必要です。
+これだけ多数のラベルを、
+ラベルの名前が重複しないように名付けるのは、
+不可能ではありませんが大変面倒です。
+
+GAS には、
+このような、
+「その場でしか (局所的にしか) 使わないラベル」を簡単に付ける仕組みとして局所ラベルが用意されています。
+
+局所ラベルは「数字:」という形式です。
+ここで「数字」は (負でない) 整数です。
+局所ラベルは、
+例えば、
+「1:」、
+「2:」などのように表記します。
+
+局所ラベルは「数字 b」や「数字 f」によって参照することができます。
+直前の「数字:」という局所ラベルは「数字 b」で参照でき、
+直後の「数字:」という局所ラベルは「数字 f」で参照できます。
+
+プログラム ~cmp.s~ を局所ラベルを使って書き換えると以下のようになります。
+
+#+caption: gas/cmp-local.s
+#+label: fig:gas/cmp-local.s
+#+include: "code/gas/cmp-local.s" src asm
+
+ラベル ~L1~ を局所ラベル ~1~ に、
+ラベル ~L2~ を局所ラベル ~2~ に書き換えています。
+
+説明のため、
+局所ラベルをいくつか追加しています。
+この例からわかるように、
+同じ名前の局所ラベルを繰り返し定義できます。
+局所ラベル ~1~ は 3 カ所、
+局所ラベル ~2~ は 2 カ所で定義しています。
+
+この場合、
+局所ラベルへの参照 ~1f~ は、
+「参照している箇所の直後に定義されている局所ラベル ~1~」を指します。
+同じように、
+局所ラベルへの参照 ~1b~ は、
+「参照している箇所の直前に定義されている局所ラベル ~1~」を指します。
+
+このように、
+局所ラベルは、
+局所ラベルを定義している箇所と、
+局所ラベルを参照している箇所が近いことを前提にしています。
+局所ラベルを使うと、
+~L1824~ とか ~L8248~ のような使い捨てのラベルを定義する必要がなくなります。
+
+*** 命令
+
+それぞれの文には、
+アセンブリ言語の命令か、
+GAS への *疑似命令 (ディレクティブ)* を記述できます。
+GAS では、
+ピリオド (~.~) から始まる命令はすべて GAS の疑似命令 (アセンブラに対する指示) です。
+
+例えば、
+以下のアセンブリ言語プログラムでは、
+#+begin_src asm
+        .file   "add.c"
+        .text
+        .globl  main
+        .type   main, @function
+main:
+.LFB0:
+        .cfi_startproc
+        movl    i, %eax
+        addl    $5678, %eax
+        movl    %eax, i
+#+end_src
+.file、
+.text、
+.global、
+.type、
+~.cfi_startproc~ などはすべて GAS の疑似命令です。
+
+~.LFB0~ もピリオド (~.~) から始まっているため、
+一見すると疑似命令に見えますが、
+直後にコロン (~:~) が付いているので、
+これはラベルです (~.LFB0~ という名前のラベルです)。
+
+上の例では、
+ラベルと疑似命令を除いた
+#+begin_src asm
+        movl    i, %eax
+        addl    $5678, %eax
+        movl    %eax, i
+#+end_src
+の 3 つのみがアセンブリ言語の命令です。
+GAS は、
+これら 3 つの命令に対応する機械語のプログラムを生成します。
+
+*** 定数 (整数)
+
+アセンブリ言語の命令や疑似命令のオペランド (引数) には、
+*数値定数* および *文字定数* を記述できます。
+
+数値定数には、
+*整数 (integer)*、
+*bignum (32 ビットを超える整数)*、
+*flonum (浮動小数点数)* を指定できます。
+整数は、
+C 言語の int に格納できる整数と同じです。
+bignum と flonum は GAS 特有の表現です。
+bignum は int に収まらない (通常、
+32 ビットを超える) 大きさの整数であり、
+flonum は浮動小数点数です。
+
+例えば、
+#+begin_src asm
+        addl    $5678, %eax
+#+end_src
+は、
+10 進数の 5678 をレジスタ EAX に格納するという命令です。
+アセンブリ言語の命令が ~addl~ で、
+~addl~ のオペランドが ~$5678~ と ~%eax~ です。
+最初のオペランドである ~$5678~ は整数の数値定数です。
+数値の先頭のドル記号 (~$~) は、
+この値が即値であることを意味しています。
+
+同様に、
+#+begin_src asm
+        .long   1234
+#+end_src
+は 10 進数の 1 234 を格納したビット列を生成することを GAS に指示する疑似命令です。
+疑似命令が ~.long~ で、
+~.long~ のオペランドが ~1234~ です。
+疑似命令のため、
+ピリオド (~.~) から始まっています。
+
+疑似命令 ~.long~ は、
+オペランドに指定された整数を格納したビット列を生成します。
+整数を、
+何バイトに格納するか、
+また、
+どのようなエンディアンネス ([[sec:mem/endianness]] 節) で格納するかは、
+対象となるコンピュータによって変化します。
+例えば、
+IA-32 アーキテクチャの場合、
+C 言語の int は 32 ビットです。
+このため、
+#+begin_src asm
+        .long   1234
+#+end_src
+は、
+4 バイト (= 32 ビット) のビット列を生成します。
+IA-32 アーキテクチャはリトルエンディアンなので、
+#+begin_src raw
+d2 04 00 00
+#+end_src
+という 4 バイトを生成します。
+
+*** 定数 (bignum)
+
+整数や bignum には、
+10 進数、
+2 進数、
+8 進数、
+16 進数を指定できます。
+2 進数は、
+数値の先頭に ~0b~ または ~0B~ を付与します。
+8 進数は、
+数値を ~0~ から始めます。
+16 進数は、
+数値の先頭に ~0x~ または ~0X~ を付与します。
+16 進数の各桁には大文字の A〜F と小文字の a〜f の両方が使用できます。
+
+GAS において有効な数値定数の例を示します。
+これらは、
+すべて 10 進数の 1 234 を意味します。
+#+begin_src asm
+     .long 0b10011010010
+     .long +0b10011010010
+     .long 0B10011010010
+     .long 02322
+     .long +02322
+     .long 1234
+     .long +1234
+     .long 0x4d2
+     .long +0x4d2
+     .long 0X4D2
+#+end_src
+
+bignum は、
+整数と同じように、
+10 進数、
+2 進数、
+8 進数、
+16 進数を指定できます。
+bignum と整数の違いは、
+bignum は 32 ビットを超える数値であるという点だけです。
+bignum が何ビットになるかは、
+GAS の疑似命令で指定します。
+#+begin_src asm
+	.quad   1234567890123456789
+	.octa   12345678901234567891234567890123456789
+#+end_src
+.quad は 8 バイトの bignum を生成する疑似命令です。
+リトルエンディアンのコンピュータでは、
+#+begin_src raw
+0x15 0x81 0xe9 0x7d 0xf4 0x10 0x22 0x11
+#+end_src
+という 8 バイトを生成します。
+同様に、
+.octa は 16 バイトの bignum を生成する疑似命令です。
+
+*** 定数 (flonum)
+
+flonum は、
+C 言語などの一般的なプログラミング言語と同じような形式で指定します。
+#+begin_src asm
+	.float  1.23e4
+	.float  4.56e-3
+	.float  6.02214076e23
+#+end_src
+.float は flonum を生成する疑似命令です。
+.float が何バイトの浮動小数点数を生成するかは、
+対象とするコンピュータによります。
+IA-32 アーキテクチャの場合、
+.float は 32 ビット (単精度) の浮動小数点を生成します。
+
+GAS では、
+数値の先頭に「0 + 英字」を付与することにより flonum であることを明示します。
+「英字」には小文字の e が推奨されていますが、
+大文字でも、
+他の英字でもかまいません。
+#+begin_src asm
+	.float  0e1.23e4
+	.float  0E4.56e-3
+	.float  0f6.02214076e+23
+#+end_src
+
+*** 定数 (文字)
+
+単一の *文字 (character) 定数* は、
+先頭にシングルクォート (~'~) を付与します。
+バックスラッシュ (~\~) でクォートすることにより、
+制御文字を表すことができます。
+
+| 表記 | 数値 | 意味               |
+|------+------+--------------------|
+| ~\b~ | 0x07 | バックスペース     |
+| ~\t~ | 0x09 | 水平タブ           |
+| ~\n~ | 0x0a | 改行               |
+| ~\f~ | 0x0c | フォームフィード   |
+| ~\r~ | 0x0d | キャリッジリターン |
+| ~\"~ | 0x22 | ダブルクォート     |
+| ~\\~ | 0x5c | バックスラッシュ   |
+
+以下はすべて同じ意味です。
+#+begin_src asm
+	.byte	65
+	.byte	0101
+	.byte	0x41
+	.byte	'A
+	.byte	'\A
+#+end_src
+.byte は、
+オペランドに指定された値を格納する 1 バイトを生成する疑似命令です。
+英字の ~A~ の文字コードは 0x41 (10 進数で 65、
+8 進数で 0101) です。
+~\A~ は ~A~ をバックスラッシュ (~\~) でクォートしています。
+~\A~ は特別な意味を持たず、
+単に ~'A~ と書いたものと同じ意味です。
+
+C 言語の文字定数は ~'A'~ のようにシングルクォートで文字を囲みます。
+GAS の文字定数は ~'A~ のようにシングルクォートは先頭にしか付きません。
+似ているようで異なるため気を付けてください。
+
+*** 定数 (文字列)
+
+文字の並びである *文字列 (string) 定数* は、
+ダブルクォート (~"~) で囲みます。
+文字定数と同じように、
+バックスラッシュ (~\~) によるクォートは特別の意味を持ちます。
+
+| 表記    |  数値 | 意味                             |
+|---------+-------+----------------------------------|
+| ~\b~    |  0x07 | バックスペース                   |
+| ~\t~    |  0x09 | 水平タブ                         |
+| ~\n~    |  0x0a | 改行                             |
+| ~\f~    |  0x0c | フォームフィード                 |
+| ~\r~    |  0x0d | キャリッジリターン               |
+| ~\"~    |  0x22 | ダブルクォート                   |
+| ~\\~    |  0x5c | バックスラッシュ                 |
+| ~\NNN~  | 0oNNN | 8 進数表記 (N は数字)            |
+| ~\xHHH~ | 0xHHH | 16 進数表記 (H は数字/A〜F/a〜F) |
+
+文字列定数の例です。
+#+begin_src asm
+	.ascii	"Hello, World!\n"
+	.asciz	"Welcome, Back!\n"
+	.asciz	"\\T\105S\x54"
+#+end_src
+.ascii はオペランドに指定された文字列定数に対応するバイト列を生成する疑似命令です。
+#+begin_src asm
+	.ascii	"Hello, World!\n"
+#+end_src
+の場合、
+#+begin_src raw
+48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 21 0a
+H  e  l  l  o  ,  _  W  o  r  l  d  !  \n
+#+end_src
+という 14 バイトが生成されます。
+
+.asciz は .ascii と同じですが、
+末尾に 0x00 の 1 バイトが余計に生成される点のみが異なります。
+C 言語のように、
+文字列がヌル (0x00) で終端されている文字列を生成する場合に使用します。
+したがって、
+#+begin_src asm
+	.asciz	"Welcom, Back!\n"
+#+end_src
+の場合、
+#+begin_src raw
+57 65 6c 63 6f 6d 65 2c 20 42 61 63 6b 21 0a 00
+W  e  l  c  o  m  e  ,  _  B  a  c  k  !  \n \0
+#+end_src
+という 16 バイトが生成されます。
+
+最後はバックスラッシュによるクォートの例です。
+~\\~ はバックスラッシュそのものを表します。
+~\105~ は 8 進数で 0o105 の文字 (E) を表します。
+~\x54~ は 16 進数で 0x54 の文字 (T) を表します。
+したがって、
+#+begin_src asm
+	.asciz	"\\T\105S\x54"
+#+end_src
+によって ~\TEST~ に相当する
+#+begin_src raw
+5c 54 45 53 54 00
+\  T  E  S  T  \0
+#+end_src
+の 6 バイトが生成されます。
+
+*** セクション
+
+アセンブラは機械語のプログラムやプログラムが使用するデータを、
+バイナリ形式のオブジェクトファイルとして出力します。
+通常、
+アセンブラが出力するオブジェクトファイルは複数の *セクション (section)* に分かれています。
+
+アセンブラにおけるセクションとは、
+ある連続した (途中に抜けのない) アドレスの範囲です。
+GAS は、
+それぞれのセクションを 0 番地から開始します。
+機械語のプログラムを格納するセクションも、
+プログラムが使用するデータを格納するセクションも、
+すべて 0 番地から開始します。
+機械語のプログラムも、
+プログラムが使用するデータも、
+最終的にはメモリ上の (通常、
+0 番地ではない) どこかのアドレスに配置されて実行されます。
+アセンブラが生成したオブジェクトファイルを、
+実際の適切なメモリ上の番地に配置するのはリンカの役割です。
+リンカが、
+各セクションを配置するアドレスを決定することを *再配置 (relocation)* と呼びます。
+GAS は、
+それぞれのセクションが、
+実際のメモリのどこに配置されるかは関与しません。
+
+GAS が生成するオブジェクトファイルは .text、
+.data、
+.bss と呼ばれる 3 つのセクションを持ちます。
+
+GAS は機械語のプログラムを *.text セクション* に格納します。
+アセンブルされたアセンブリ言語のプログラムは、
+通常、
+.text セクション内に生成されます。
+.text セクションという名称から、
+文字列のようなテキストデータを格納するセクションと思うかもしれません。
+ここでの text (テキスト) は code (コード) や program (プログラム) という意味です。
+
+GAS は機械語のプログラム使用するデータを .data セクションと .bss セクションに格納します。
+
+*.data セクション* は文字通りプログラムが使用するデータを格納するセクションです。
+文字通り、
+データ (data) を格納するためのセクションです。
+GAS は、
+整数、
+bignum、
+flonum のような数値定数や文字列定数などを .data セクションに配置します。
+
+.text セクションと .data セクションの 2 つがあれば十分のようにも思えます。
+しかし、
+プログラムが使用するデータのために、
+もう一つ .bss セクションがあります。
+*.bss セクション* は初期化されてないデータ領域のためのセクションです。
+つまり、
+.data セクションは、
+1234 のような数値や、
+~Hello, World!~ のような文字列など、
+内容がすでに決まっている (初期化済みの) データを格納します。
+一方、
+.bss セクションは、
+4 バイトの (あとで数値を格納するための) 領域や、
+256 バイトの (あとで文字列を格納するための) 領域など、
+内容がまだ決まっていない (初期化されていない) データのための領域を格納します。
+
+初期化済みのデータも、
+初期化されていないデータも、
+まとめて .data セクションに格納してもよいのですが、
+初期化されていないデータを分けておくとオブジェクトファイルのサイズを小さく抑えられます。
+例えば、
+初期化済みのデータが 100 K バイトで、
+初期化されてないデータが 200 K バイトあるとします。
+素朴な方法は、
+初期化されていないデータの部分をすべてゼロで埋め、
+これらを .data セクションに格納するという方法です。
+この場合、
+100 K バイトと 200 K バイトの両方のデータを格納するため、
+.data セクションの大きさが 300 K バイトになります。
+意味のあるデータが 100 K バイトにもかかわらず、
+合計 300 K バイトのデータ領域になってしまいます。
+
+初期化されていないデータは、
+データそのものを記録しておく必要はありません。
+そこで、
+初期化済みのデータ 100 K バイトを .data セクションに格納し、
+初期化されていない 200 K バイトのデータを .bss セクションに格納します。
+このとき、
+.bss セクションには 200 K バイトのダミーデータを格納するのではなく、
+初期化されてないデータ領域の大きさのみを記録します。
+このようにすれば、
+.data セクションと .bss セクションが、
+それぞれ 100 K バイトと 4 バイトになるため、
+データ領域の合計が約 100 K バイトで済みます。
+
+#+begin_note
+「bss セクション」という名前はどこから来ているのだろう?
+と思い、
+名前の由来を調べてみました。
+
+Wikipedia  の「.bss」には、
+#+begin_quote
+In computer programming, the block starting symbol (abbreviated to .bss or
+bss) is the portion of an object file, executable, or assembly language code
+that contains statically-allocated variables that are declared but have not
+been assigned a value yet.
+
+(和訳) \\ コンピュータプログラミングでは、
+block staring symbol (.bss または .bss と略されます) は、
+オブジェクトファイルや、
+実行ファイル、
+アセンブリ言語コードの部分です。
+宣言されているが値がまだ割り当てられていないという、
+静的に割り当てられた変数を含みます。
+#+end_quote
+という記述がありますが、
+「block starting symbol (ブロックを開始するシンボル)」という名前はどうもしっくりきません。
+
+UNIX FAQ \cite{UNIX:FAQ} に、
+C 言語および UNIX オペレーティングシステムの開発者である、
+デニス・リッチー氏の以下の回答が記載されていました。
+#+begin_quote
+bss = "Block Started by Symbol"
+
+Dennis Ritchie says:
+
+Actually the acronym (in the sense we took it up; it may have other credible
+etymologies) is "Block Started by Symbol." It was a pseudo-op in FAP (Fortran
+Assembly [-er?]  Program), an assembler for the IBM 704-709-7090-7094
+machines.  It defined its label and set aside space for a given number of
+words.
+
+(和訳) \\
+bss = "Block Started by Symbol"
+
+デニス・リッチー曰く:
+
+実際には、
+この頭字語 (私たちが取り上げた意味で。
+他にも信頼できる語源があるかもしれません) は「Block Started by Symbol」です。
+これは、
+IBM 704-709-7090-7094 マシン用のアセンブラである FAP (Fortran Assembly (Assembler?)
+Program) の疑似命令でした。
+この疑似命令は、
+ラベルを定義し、
+与えられた語数の領域を確保しました。
+#+end_quote
+
+アセンブラの疑似命令 BSS という名前のものがあり、
+この疑似命令が指定された語数のメモリを確保するものだったようです。
+初期化されていないデータ領域には指定した大きさの領域が確保されるため、
+これを「bss セクション」と名付けたそうです。
+#+end_note
+
+3 つのセクションを利用した単純なアセンブリ言語プログラムの例です。
+
+#+caption: gas/sections.s
+#+label: fig:gas/sections.s
+#+include: "code/gas/sections.s" src asm
+
+2 行目の
+#+begin_src asm
+	.text		# .text セクションの開始
+#+end_src
+における .text は GAS の疑似命令です。
+.text セクションがここから始まることを GAS に指示しています。
+
+.data セクションを構成しているのは以下の 3 行です。
+#+begin_src asm
+	.data		# .data セクションの開始
+i:
+	.long	1234	# 32 ビットの整数 1234 を確保
+#+end_src
+.data も GAS の疑似命令です。
+.data セクションがここから始まることを GAS に指示しています。
+~.long~ はオペランドに指定された整数を格納したバイト列を生成する疑似命令です。
+これにより、
+.data セクション中に、
+1234 の符号なし整数を表現する
+#+begin_src raw
+d2 04 00 00
+#+end_src
+という 4 バイトが確保されます。
+
+最後の
+#+begin_src asm
+	.lcomm	j, 4	# .bss セクションに 4 バイトを確保
+#+end_src
+も GAS の疑似命令です。
+上の例では、
+.lcomm によって ~j~ というシンボルに対応した、
+4 バイトの領域が .bss セクションに確保されます。
+
+オブジェクトファイルの形式によっては、
+これらの 3 つのセクション以外のセクションを持つものもあります。
+GAS では、
+疑似命令 .section によってセクションを新しく定義できます。
+疑似命令 .section の詳細については GAS のドキュメントを参照してください。
+
+*** 式
+
+GAS では、
+命令や疑似命令のオペランドに *式 (expression)* を記述できます。
+GAS におけるすべての式は、
+*アドレス* または *数値* (整数または bignum) を表します。
+
+GAS の式には以下のような演算子が利用できます。
+
+| 種別       | 優先度   | 演算子     | 意味                 |
+|------------+----------+------------+----------------------|
+| 単項演算子 |          | ~-~        | 負数 (2 の補数表現)  |
+|            |          | =~=        | ビット単位の否定     |
+|------------+----------+------------+----------------------|
+| 二項演算子 | 優先度 1 | ~*~        | 乗算                 |
+|            |          | ~/~        | 除算                 |
+|            |          | ~%~        | 剰余算               |
+|            |          | ~<<~       | 左シフト             |
+|            |          | ~>>~       | 右シフト             |
+|            | 優先度 2 | ~&~        | ビット単位の AND     |
+|            |          | \vbar      | ビット単位の OR      |
+|            |          | ~^~        | ビット単位の XOR     |
+|            |          | ~!~        | ビット単位の OR, NOT |
+|            | 優先度 3 | ~+~        | 加算                 |
+|            |          | ~-~        | 減算                 |
+|            |          | ~==~       | 比較 (等しい)        |
+|            |          | ~!=~, ~<>~ | 比較 (等しくない     |
+|            |          | ~<~        | 比較 (より小さい)    |
+|            |          | ~>~        | 比較 (より大きい)    |
+|            |          | ~>=~       | 比較 (以上)          |
+|            |          | ~<=~       | 比較 (以下)          |
+|            | 優先度 4 | ~&&~       | 論理積               |
+|            |          | \vbar\vbar | 論理和               |
+
+優先度 1 が最も優先度が高く、
+優先度 4 が最も優先度の低い演算子です。
+C 言語の演算子と同じような演算子が利用できますが、
+演算子の優先度がかなり異なっています。
+
+- GAS ではシフト演算の優先度が 1 (最優先) である (C 言語では、シフト演
+  算の優先度は加算・減算より低く、比較演算より高い)
+- ビット単位の AND/OR/XOR 演算の優先度は比較演算の優先度より高い (C 言
+  語では、ビット単位の AND/OR/XOR 演算の優先度は比較演算より低く、論理
+  演算より高い)
+- ビット単位の AND/OR/XOR 演算の優先度はすべて等しい (C 言語では、優先
+  度は AND → XOR → OR の順)
+- 論理和・論理積の優先度が等しい (C 言語では、優先度は論理的 → 論理和
+  の順)
+
+GAS では、
+演算子 ~!~ は単項演算子の否定ではなく、
+二項演算子の「ビット単位の OR, NOT」という珍しい演算子です。
+GAS における ~a ! b~ は C 言語における ~a | (~b)~ に相当します。
+つまり、
+「a」と「b のビット単位の否定」のビット単位の OR です。
+
+比較演算は、
+オペランドを符号付き整数として扱います。
+また、
+比較演算の結果が真 (true) の場合は -1 を返し、
+偽 (false) の場合には 0 を返します。
+C 言語における比較演算と挙動が異なるため注意してください。
+C 言語では、
+比較演算の結果が真の場合は (通常は) 1 を返し、
+偽の場合には 0 を返します。
+GAS は、
+負数には 2 の補数表現を使うので、
+比較演算の結果が真の場合、
+すべてのビットが 1 となることを意味します。
+逆に、
+比較演算の結果が偽の場合、
+すべてのビットが 0 となることを意味します。
+
+ただし、
+GAS の論理積・論理和の結果は、
+C 言語の場合と同じように、
+真 (true) の場合に 1 を返し、
+偽 (false) の場合には 0 を返します。
+
+# シンボル . 現在のアドレスを意味します。
+
+#+begin_note
+GAS の式で珍しい (そしてトラブルの元になりそうな) のは、
+何も指定しない式 (空式 (empty expression)) が有効であるという点です。
+GAS では、
+式が必要な箇所に式が存在しない場合、
+そこに「空の式」があると見なします。
+このため、
+意外なことに、
+#+begin_src asm
+	movl	, %eax
+#+end_src
+は GAS にとって正しい式です。
+空式は定数 0 として扱われ、
+上記は
+#+begin_src asm
+	movl	0, %eax
+#+end_src
+と同じ意味になります。
+誤ってオペランドを書き忘れたときに、
+GAS はそこに空式がある (定数 0 が指定された) と見なすため、
+注意してください。
+#+end_note
+
+** IA-32 アーキテクチャ固有の話題
+<<sec:gas/ia32-specific>>
+
+GAS は数十種類の CPU に対応したアセンブラです。
+ここまでの説明の大半は、
+対象となるコンピュータの CPU やアーキテクチャには依存しません。
+このため、
+対象となるコンピュータによらず、
+同じプログラムの起動方法、
+同じアセンブリ言語プログラムの文法、
+同じ GAS の疑似命令が使えます。
+
+ただし、
+アセンブリ言語やアセンブラは、
+対象となるコンピュータやその CPU に大きく依存しています。
+GAS を利用するためには、
+それぞれのアーキテクチャ固有の記法もあわせて理解する必要があります。
+
+本書では、
+IA-32 アーキテクチャを中心にアセンブリ言語プログラミングを解説しています。
+以下では、
+GAS を使って IA-32 アーキテクチャ向けのアセンブリ言語プログラムを作成する際に覚えておくべきことを説明します。
+
+まず、
+*AT&T アセンブラ構文 (AT&T assembler syntax)* と *インテルアセンブラ構文 (Intel assembler syntax)* の違いを押さえておきましょう。
+
+前述のように、
+アセンブリ言語は ISO のような標準化団体における標準化が行われていません。
+いわゆる業界標準のように、
+標準化団体では標準化されていませんが、
+「この業界ではこうするのが普通」、
+「あの業界ではああするのが普通」という状況です。
+
+IA-32 アーキテクチャ向けのアセンブリ言語には、
+- AT&T が定めたアセンブリ言語の記述法 (AT&T 構文)
+- インテルが定めたアセンブリ言語の記述法 (インテル 構文)
+の 2 種類が存在します。
+
+2 種類の記述法の例を示します。
+まったく同じ処理を行うプログラムを AT&T 構文とインテル構文で書いています。
+
+まず、
+AT&T 構文で書いたアセンブリ言語プログラムの例です。
+
+#+caption: gas/att.s
+#+label: fig:gas/att.s
+#+include: "code/gas/att.s" src asm
+
+次は、
+インテル構文で書いたアセンブリ言語プログラムの例です。
+
+#+caption: gas/intel.s
+#+label: fig:gas/intel.s
+#+include: "code/gas/intel.s" src asm
+
+どちらも同じ IA-32 アーキテクチャ向けのアセンブリ言語プログラムなので、
+そっくりと言えばそっくりです。
+ただし、
+詳細に見てゆくと、
+細かい点がいくつか異なっています。
+
+*** オペランドの順番
+
+最も大きな違いは命令のオペランドの順番です。
+例えば、
+レジスタ EAX に 0x1234 5678 を格納するという処理は、
+AT&T 構文では
+#+begin_src asm
+	movl	$0x12345678, %eax # 32 ビットの即値をレジスタ EAX に格納
+#+end_src
+のように書きます。
+
+0x1234 5678 *を* レジスタ EAX *に* 格納するため、
+0x1234 5678 を *ソースオペランド (source operand)*、
+レジスタ EAX を *デスティネーションオペランド (destination オペランド)* と呼びます。
+「ソースオペランド」、
+「デスティネーションオペランド」どちらもカナカナの連続で意味がわかりづらいかもしれません。
+一部日本語で表記すると、
+*出所オペランド* と *宛先オペランド* です。
+日本語では、
+「ソースオペランド」、
+「デスティネーションオペランド」と表記することが多いようですが、
+本書では意味を明確にするため、
+「出所オペランド」および「宛先オペランド」と表記します。
+
+AT&T 構文では、
+「命令のニーモニック出所オペランド, 宛先オペランド」の順番に記述します。
+
+一方、
+インテル構文では、
+#+begin_src asm
+	mov	eax,0x12345678    # 32 ビットの即値をレジスタ EAX に格納
+#+end_src
+のように書きます。
+出所オペランドと宛先オペランドの順番が、
+AT&T 構文とは逆で、
+「命令のニーモニック宛先オペランド, 出所オペランド」の順番に記述します。
+
+出所オペランドと宛先オペランドのどちらを先に書くべきか?
+という問いに対し、
+筆者は、
+答えはない (優劣が付けられない) と思います。
+
+日本語が母語の人には、
+インテル構文のほうが自然に感じられることでしょう。
+日本語で説明すれば、
+「レジスタ EAX に 0x1234 5678 を格納する」となる処理を、
+日本語の語順に近い形で
+#+begin_src asm
+	mov	eax,0x12345678    # 32 ビットの即値をレジスタ EAX に格納
+#+end_src
+のように自然に書けます。
+
+逆に、
+英語が母語の人には、
+AT&T 構文のほうが自然に感じられると思います。
+英語で説明すれば「move the number 0x1234 5678 to the EAX register」となる処理を、
+英語の語順のまま
+#+begin_src asm
+	movl	$0x12345678, %eax # 32 ビットの即値をレジスタ EAX に格納
+#+end_src
+のように自然に書けます。
+
+GAS は AT&T 構文を採用しています。
+もともと GAS は AT&T 構文しか使用できませんでしたが、
+2000 年にリリースされた binutils 2.10 からインテル構文もサポートしています。
+インテル構文を使用するためには、
+GAS の疑似命令 ~.intel_syntax~ を使用します。
+ただし、
+GAS を使うのであれば基本的には AT&T 構文を使うことをおすすめします。
+インテル構文で書かれた既存のアセンブリ言語プログラムを GAS に移植するような場合にはインテル構文が便利でしょう。
+
+*** 命令の表記法
+
+オペランドの順番以外の大きな違いは、
+命令のニーモニックの表記法です。
+
+AT&T 構文では、
+#+begin_src asm
+	movl	$0x12345678, %eax # 32 ビットの即値をレジスタ EAX に格納
+        movw    $0x1234, %ax      # 16 ビットの即値をレジスタ AX に格納
+        movb    $0x12, %al        # 8 ビットの即値をレジスタ AL に格納
+#+end_src
+のように、
+命令のニーモニックの末尾に (一見すると余計に見える) l、
+w、
+b 等の文字が付いています。
+
+一方、インテル構文では、
+#+begin_src asm
+        mov     eax,0x12345678    # 32 ビットの即値をレジスタ EAX に格納
+        mov     ax,0x1234         # 16 ビットの即値をレジスタ AX に格納
+        mov     al,0x12           # 8 ビットの即値をレジスタ AL に格納
+#+end_src
+のように、
+命令のニーモニックの末尾に文字が付いていません。
+
+AT&T 構文における l、
+w、
+b 等の文字 (*接尾部* や *サフィックス (suffix)* と呼びます) は、
+メモリを扱う命令の *データサイズ* を表しています。
+つまり、
+movl、
+movw、
+movb は、
+どれも同じ MOV 命令ですが、
+末尾の文字は MOV 命令が扱うデータの大きさを表しています。
+末尾の l は 32 ビット (long の l)、
+w は 16 ビット (word の w)、
+b は 8 バイト (byte の b) を表しています。
+このため、
+例えば、
+#+begin_src asm
+	movl	$0x12, %eax # 32 ビットの即値をレジスタ EAX に格納
+#+end_src
+であれば、
+出所オペランドが 0x12 と 8 ビットの値に見えますが、
+movl のように末尾に l (long) が付いているので、
+レジスタ EAX には 0x00000012 が格納されます。
+
+インテル構文では、
+#+begin_src asm
+        mov     eax,0x12345678    # 32 ビットの即値をレジスタ EAX に格納
+        mov     ax,0x1234         # 16 ビットの即値をレジスタ AX に格納
+        mov     al,0x12           # 8 ビットの即値をレジスタ AL に格納
+#+end_src
+のように接尾部 (サフィックス) は付きません。
+
+「インテル構文では、
+接尾部がないのに、
+どうやってメモリを扱う命令のデータサイズがわかるのだろう?」
+と疑問を持つかもしれません。
+上の例では、
+レジスタ EAX、
+AX、
+AL の大きさが、
+それぞれ 32 ビット、
+16 ビット、
+8 ビットであり、
+AT&T 構文のような接尾部がなくてもデータサイズが判定できます。
+
+GAS でも、
+オペランドからデータサイズが判定できる場合には、
+接尾部を省略し、
+#+begin_src asm
+	mov	$0x12345678, %eax # 32 ビットの即値をレジスタ EAX に格納
+        mov	$0x1234, %ax      # 16 ビットの即値をレジスタ AX に格納
+        mov	$0x12, %al        # 8 ビットの即値をレジスタ AL に格納
+#+end_src
+のように書くことも可能です。
+
+ただし、
+必ずしもオペランドからデータサイズが判定できるわけではなく、
+以下のような場合には接尾部が不可欠です。
+#+begin_src asm
+        movl    $0x9abcdef0, i    # 32 ビットの即値を i 番地に格納
+#+end_src
+接尾部を省略して、
+#+begin_src asm
+        mov	$0x9abcdef0, i    # 32 ビットの即値を i 番地に格納
+#+end_src
+のように書くとデータサイズが判定できないためエラーになります (アセンブルに失敗します)。
+
+インテル構文の場合は、
+以下の例のように、
+オペランドにデータサイズを表す *接頭部 (prefix; プレフィックス)* を付与します。
+#+begin_src asm
+        mov     dword ptr i, 0x9abcdef0 # 32 ビットの即値を i 番地に格納
+#+end_src
+ここでは ~dword ptr~ が、
+データサイズが 32 ビットであることを表します。
+データサイズが 16 ビットの場合は ~word ptr~、
+データサイズが 8 ビットの場合は ~byte ptr~ という接頭部をオペランドの前に付与します。
+
+*** 即値およびレジスタの表記法
+
+他には、
+即値およびレジスタの表記法が異なります。
+
+AT&T 構文では、
+#+begin_src asm
+        movl    $0x12345678, %eax # 32 ビットの即値をレジスタ EAX に格納
+#+end_src
+のように表記します。
+即値の前に ~$~ という *接頭文字* を付与します。
+
+接頭文字 ~$~ を付けずに
+#+begin_src asm
+        movl    0x12345678, %eax # 0x12345678 番地の値をレジスタ EAX に格納
+#+end_src
+のように書くと、
+これは 0x1234 5678 という即値では _なく_、
+0x1234 5678 番地に格納されている値をレジスタ EAX に格納する、
+という意味になります。
+
+また、
+AT&T 構文では、
+レジスタ名の前に ~%~ という接頭文字を付与します。
+GAS では、
+「~%~ 名前」は、
+すべてレジスタ名を意味します。
+
+接頭文字 ~%~ を付けずに
+#+begin_src asm
+        movl    $0x12345678, eax # 32 ビットの即値を eax 番地に格納する
+#+end_src
+と書くと、
+0x12345678 を、
+レジスタ EAX では *なく*、
+*~eax~ というラベルが指す番地* に格納する、
+という意味になります。
+ただし、
+IA-32 アーキテクチャの MOV 命令は、
+出所オペランドと宛先オペランドに即値とメモリアドレスを指定できないため、
+これはエラーになります (アセンブルに失敗します)。
+
+インテル構文では、
+これらの接頭文字はどちらも不要です。
+
+*** 間接メモリ参照の表記法
+
+AT&T 構文とインテル構文のもう 1 つの違いは、
+*間接メモリ参照 (indirect memory reference)* の記述法です。
+
+間接メモリ参照とは、
+その名前が表すように、
+「間接的に」メモリを参照する方法です。
+例えば、
+「メモリの 0x12345678 番地」のようにメモリの番地を「直接」指定するのではなく、
+「0x12345678 に、
+レジスタ EAX の値を 4 倍して足して、
+その結果から 4 を引いた番地」のように、
+何らかの計算結果によって定まる番地を「間接的に」指定する方法です。
+
+IA-32 アーキテクチャにおける間接メモリ参照は、
+参照するアドレスを以下のように決定します。
+\begin{align}
+  アドレス = ベースレジスタの値 + インデックスレジスタの値 \times 倍率 + 変位
+\end{align}
+*ベースレジスタ (base register)* は、
+間接メモリ参照において基準となるアドレスを指定するレジスタです。
+*インデックスレジスタ (index register)* は、
+間接メモリ参照において基準からのずれを表すレジスタです。
+インデックスレジスタの値には *倍率 (scale)* が掛けられます。
+このため、
+倍率が 1 であれば、
+インデックスレジスタの値だけアドレスが増減します。
+このため、
+倍率が 2 であれば、
+「インデックスレジスタの値 \times 2」だけアドレスが増減します。
+ただし、
+倍率には、
+1、
+2、
+4、
+8 のいずれかの値しか指定できません。
+最後の *変位 (displacement)* も基準からのずれを表す数値 (定数) です。
+変位は、
+カタカナで *ディスプレイスメント* と表記されることもあります。
+
+つまり、
+間接アドレス参照とは、
+2 つのレジスタ (ベースレジスタとインデックスレジスタ) と、
+変位 (ディスプレイスメント) の和によってアドレスを指定する方法です。
+ただし、
+「ベースレジスタ」や「インデックスレジスタ」のような特別なレジスタがあるわけではありません。
+レジスタ EAX、
+EBX、
+ECX のような汎用レジスタをベースレジスタやインデックスレジスタに指定します。
+
+AT&T 構文では、
+間接アドレス参照のオペランドを
+#+begin_quote
+変位(ベースレジスタ, インデックスレジスタ, 倍率)
+#+end_quote
+のように記述します。
+一方、
+インテル構文では
+#+begin_quote
+[ベースレジスタ + インデックスレジスタ * 倍率 + 変位]
+#+end_quote
+のように記述します。
+
+AT&T 構文における間接アドレス参照の例をいくつか見てみましょう。
+#+begin_src asm
+	movl	$123, -4(%ebp)
+#+end_src
+「レジスタ EBP の値から 4 を引いたアドレス」に、
+10 進数の 123 (データサイズは 32 ビット) を格納します。
+変位とベースレジスタのみを指定しています。
+インデックスレジスタと倍率を省略した記法です。
+
+#+begin_src asm
+	movl	$123, i(, %eax, 4)
+#+end_src
+「レジスタ EAX の値を 4 倍し、
+ラベル ~i~ の指すアドレスを加算したアドレス」に 10 進数の 123 (データサイズは 32 ビット) を格納します。
+変位、
+インデックスレジスタ、
+倍率を指定していて、
+ベースレジスタを省略した記法です。
+
+#+begin_src asm
+	movw	$123, 8(%ebp, %eax, 2)
+#+end_src
+変位、
+ベースレジスタ、
+インデックスレジスタ、
+倍率をすべて指定しています。
+「レジスタ EBP の値に、
+レジスタ EAX の値の 2 倍を加算し、
+さらに 8 を加算したアドレス」に 10 進数の 123 (データサイズは 16 ビット) を格納しています。
+
+上の 3 つの例は、
+インテル構文では以下のように書きます。
+#+begin_src asm
+	mov	dword ptr [ebp - 4], 123
+	mov	dword ptr [eax * 4 + i], 123
+	mov	word ptr [ebp + eax * 2 + 8], 123
+#+end_src
+AT&T 構文よりも、
+インテル構文のほうが直感的でわかりやすいと思います。
+
+** GAS の疑似命令 (ディレクティブ)
+<<sec:gas/directive>>
+
+ここでは GAS の疑似命令を説明します。
+ただし、
+GAS バージョン 2.31.1 では 120 種類以上の疑似命令があります。
+それぞれの疑似命令を列挙しても退屈なので、
+実際に使われている疑似命令の例を示して、
+それぞれの疑似命令の意味を説明します。
+以下で紹介されていない疑似命令については、
+GAS のドキュメント /(as)Pseudo Ops/ を参照してください。
+
+ここでは、
+以下のような、
+フィボナッチ数列を求める、
+C 言語で書かれたプログラム ~fib.c~ を例に挙げます。
+再帰を使った単純なプログラムです。
+
+#+caption: gas/fib.c
+#+label: fig:gas/fib.c
+#+include: "code/gas/fib.c" src C
+
+これを GCC でコンパイルし、
+アセンブリ言語に変換したプログラムを得ます。
+#+begin_src sh
+$ gcc -S -fno-pic fib.c
+#+end_src
+これにより、
+以下のようなアセンブリ言語のプログラム ~fib.s~ が得られます。
+
+#+caption: gas/fib.s
+#+label: fig:gas/fib.s
+#+include: "code/gas/fib.s" src asm
+
+このアセンブリ言語プログラムで使用されている疑似命令を前から順番に見てゆきます。
+
+#+begin_src asm
+	.file	"fib.c"
+#+end_src
+疑似命令 .file により、
+ここから新しい論理ファイルが始まることを GAS に伝えています。
+
+#+begin_src asm
+	.text
+#+end_src
+疑似命令 .text により、
+ここから .text セクションが始まることを GAS に伝えています。
+
+#+begin_src asm
+	.globl	fib
+	.type	fib, @function
+#+end_src
+疑似命令 .global により、
+シンボル ~fib~ を他のオブジェクトファイルから参照可能とするように GAS に指示しています。
+リンカ ~ld~ によってオブジェクトファイルを結合するときに、
+シンボル ~fib~ が他のオブジェクトファイルから参照できるようになります。
+
+疑似命令 .type は、
+シンボル ~fib~ の種類 (type) を GAS に伝えています。
+シンボルの種類には function(関数) や object (オブジェクト) などがあります。
+#+begin_src asm
+fib:
+.LFB0:
+#+end_src
+ここから関数 ~fib~ が始まります。
+~.LFB0~ はピリオド ~.~ から始まっていますが、
+末尾にコロン ~:~ があるため、
+これは疑似命令ではなく ~.LFB0~ という名前のラベルです。
+~.L~ から始まるラベルは ELF 形式のファイルで利用される (外部から参照されない) ローカルラベルです。
+
+#+begin_src asm
+	.cfi_startproc
+#+end_src
+「~.cfi_~ なんとか」という疑似命令は少しややこしいので、
+よくわからなければ無視してかまいません。
+ここでは、
+興味がある人向けにこれらの疑似命令についても説明します。
+
+疑似命令 ~.cfi_startproc~ は、
+*CFI (Call Frame Information)* を初期化するように GAS に指示しています。
+CFI とは、
+この関数の呼び出し元のスタックフレームに関する情報です。
+「~.cfi_~ なんとか」という疑似命令は、
+実際に生成される機械語プログラムには影響を与えません。
+つまり、
+「~.cfi_~ なんとか」という疑似命令があってもなくても同じ機械語プログラムが生成されます。
+
+CFI は、
+実行プログラムの *デバッグ時に* 利用される情報です。
+デバッガの監視下でプログラムを実行したときに、
+それぞれの関数が呼び出されたときのスタックフレームをデバッガに知らせるために利用されます。
+GAS は、
+CFI に関する情報を、
+.eh\_frame という名前のセクションに記録します。
+
+つまり、
+このプログラムの実行ファイルを作成し、
+デバッガの監視下で実行したとします。
+このとき、
+デバッガは、
+実行ファイル中の .eh\_frame セクションを参照し、
+現在実行中の関数が、
+どの関数から呼び出されたのかを追跡できるようになります。
+言い換えれば、
+「~.cfi_~ なんとか」という疑似命令があれば、
+デバッガはそれぞれの関数がどのように呼び出されたのかを追跡できるようになります。
+もし、
+「~.cfi_~ なんとか」という疑似命令があれば、
+デバッガはそれぞれの関数がどのように呼び出されたのかを正確に追跡できなくなります。
+
+#+begin_src asm
+        pushl   %ebp
+        .cfi_def_cfa_offset 8
+        .cfi_offset 5, -8
+#+end_src
+疑似命令 ~.cfi_def_cfa_offset~ は *CFA (Canonical Frame Address)* と呼ばれる、
+関数の呼び出し元のスタックフレームのアドレスが変化したことを GAS に伝えています。
+
+直前に、
+スタックにレジスタ EBP の値をプッシュしています。
+スタック上には、
+レジスタ EBP の値、
+~fib~ からのリターンアドレス (どちらも 4 バイト) が積まれています。
+したがって、
+CFA は 8 (スタックの一番上から 8 バイト下に呼び出し元のスタックフレームがある) です。
+
+疑似命令 ~.cfi_offset~ は、
+スタック上にレジスタの値が保存されたことを GAS に伝えています。
+この例では、
+5 番目のレジスタ (レジスタ EBP です) が CFA の 8 バイト前に格納されたことを意味しています。
+
+#+begin_src asm
+	movl	%esp, %ebp
+	.cfi_def_cfa_register 5
+#+end_src
+疑似命令 ~.cfi_def_cfa_register~ は、
+CFA を表すレジスタが 5 番目のレジスタ (レジスタ EBP ) に変更になったことを伝えています (この場合、
+レジスタ ESP からレジスタ EBP に変更になりました)。
+
+#+begin_src asm
+	pushl	%ebx
+	subl	$4, %esp
+	.cfi_offset 3, -12
+#+end_src
+先ほどと同じように、
+疑似命令 ~.cfi_offset~ は、
+スタック上にレジスタの値が保存されたことを GAS に伝えています。
+今の場合、
+3 番目のレジスタ (レジスタ EBX ) が CFA の 12 バイト前に格納されたことを意味しています。
+
+#+begin_src asm
+	cmpl	$0, 8(%ebp)
+	jne	.L2
+	movl	$0, %eax
+	jmp	.L3
+.L2:
+	cmpl	$1, 8(%ebp)
+	jne	.L4
+	movl	$1, %eax
+	jmp	.L3
+.L4:
+	movl	8(%ebp), %eax
+	subl	$1, %eax
+	subl	$12, %esp
+	pushl	%eax
+	call	fib
+	addl	$16, %esp
+	movl	%eax, %ebx
+	movl	8(%ebp), %eax
+	subl	$2, %eax
+	subl	$12, %esp
+	pushl	%eax
+	call	fib
+	addl	$16, %esp
+	addl	%ebx, %eax
+.L3:
+	movl	-4(%ebp), %ebx
+	leave
+#+end_src
+このあたりは疑似命令が使われていません。
+先ほどと同様に、
+~.L2~、
+~.L3~ などは疑似命令ではなくローカルラベルです。
+
+#+begin_src asm
+	.cfi_restore 5
+	.cfi_restore 3
+	.cfi_def_cfa 4, 4
+	ret
+	.cfi_endproc
+#+end_src
+関数の最後に、
+まとめて「~cfi~ なんとか」という疑似命令が登場しています。
+疑似命令 ~.cfi_restore~ は、
+レジスタの値が ~.cfi_startproc~ を開始する前に戻ったことを意味します。
+上の例では、
+5 番目のレジスタ (レジスタ EBP) と 3 番目のレジスタ (レジスタ EBX) の値が戻ったことを意味します。
+
+疑似命令 ~.cfi_def_cfa~ は、
+CFA の基準となるレジスタと、
+そのレジスタから CFA へのオフセットが変更になったことを GAS に伝えています。
+上の例では、
+4 番目のレジスタ (レジスタ ESP) に変更になり、
+オフセットが 4 になったことを意味します。
+
+#+begin_src asm
+.LFE0:
+	.size	fib, .-fib
+#+end_src
+疑似命令 .size は、
+シンボルの大きさ (size) を GAS に指示します。
+上の例では、
+シンボル ~fib~ の大きさが「~.-fib~」であることを GAS に伝えています。
+~.-fib~ もピリオド (~.~) から始まるため疑似命令に見えますが、
+これは「ピリオド (~.~) - ~fib~」という「式」です。
+GAS では、
+単独のピリオド (~.~) は *現在のアドレス* を意味します。
+ラベル ~fib~ が関数 ~fib~ の開始アドレスを表すので、
+~.-fib~ は「現在のアドレス - ~fib~ の開始アドレス」を意味し、
+関数 ~fib~ の大きさを表します。
+
+#+begin_src asm
+	.globl	main
+	.type	main, @function
+main:
+.LFB1:
+	.cfi_startproc
+	leal	4(%esp), %ecx
+	.cfi_def_cfa 1, 0
+	andl	$-16, %esp
+	pushl	-4(%ecx)
+	pushl	%ebp
+	.cfi_escape 0x10,0x5,0x2,0x75,0
+	movl	%esp, %ebp
+	pushl	%ecx
+	.cfi_escape 0xf,0x3,0x75,0x7c,0x6
+	subl	$4, %esp
+	subl	$12, %esp
+	pushl	$10
+	call	fib
+	addl	$16, %esp
+	movl	-4(%ebp), %ecx
+	.cfi_def_cfa 1, 0
+	leave
+	.cfi_restore 5
+	leal	-4(%ecx), %esp
+	.cfi_def_cfa 4, 4
+	ret
+	.cfi_endproc
+.LFE1:
+	.size	main, .-main
+#+end_src
+このあたりも先ほどのプログラムと同じです。
+新しい疑似命令は登場していません。
+
+#+begin_src asm
+	.ident	"GCC: (Debian 8.3.0-6) 8.3.0"
+	.section	.note.GNU-stack,"",@progbits
+#+end_src
+疑似命令 .ident は、
+タグ情報をオブジェクトファイルに埋め込むことを GAS に指示します。
+オブジェクトファイルが ELF 形式の場合は、
+タグ情報は .comment セクションに記録されます。
+例えば、
+以下のようにすることにより ELF 形式のオブジェクトファイルに記録されたコメントを見ることができます。
+#+begin_src sh
+$ gcc -fno-pic -c fib.c
+$ readelf -p .comment fib.o
+
+String dump of section '.comment':
+  [     1]  GCC: (Debian 8.3.0-6) 8.3.0
+#+end_src
+
+疑似命令 .section は、
+オペランドに指定したセクションを作成することを GAS に伝えます。
+ここでは、
+note.GNU-stack という名前のセクションを作成しています。
+また、
+note.GNU-stack セクションの種類を @progbits に設定しています。
+
+.note.GNU-stack という名前のセクションは ELF 形式のオブジェクトファイルでは特別な意味を持っています。
+このセクションは、
+スタックの属性を宣言するという役割を持っています。
+
+** 章末問題
+<<sec:gas/quiz>>
+
+1. 普段自分が使用しているソフトウェアの著作権表示 (copyright notice)を
+   調べ、そのソフトウェアの内部でどのような自由ソフトウェアが利用され
+   ているかを確認せよ。
+   
+2. [[sec:gas/binutils]] 節の分析手順を真似て、C 言語の標準ライブラリ ~libc.a~
+   に含まれる関数 ~strlen~ を分析せよ。
+
+3. 自分が使用している GAS のバージョンに対応した GAS のドキュメント
+   (info) を入手せよ。
+
+   #+begin_answer
+   最新版の info は https://www.gnu.org/software/binutils の Documentation からダウンロードできる。
+
+   過去のバージョンの info は https://ftp.gnu.org/gnu/binutils/ からダウンロードできる、
+   ソースコードのアーカイブ中に含まれている。
+   #+end_answer
+
+4. 関数 ~printf~ を呼び出す簡単なプログラムを作成し、そのプログラムの
+   動作を GDB でトレースせよ。[[sec:gas/binutils]] 節と同じような手順で、
+   関数~printf~ から最終的にどのような関数を呼び出しているかをトレース
+   せよ。
+
+5. C 言語から機械語のプログラムを実行する方法 (図 [[fig:gas/c-cpuid.c]])
+   を自身の環境で同じように動作させよ。C コンパイラが生成する機械語プ
+   ログラムのスタックフレームの構造にあわせて
+   #+begin_src C
+   *(unsigned int *) (cpuid_code + 23) = (unsigned int)cpuid_code;
+   #+end_src
+   の箇所を適切に変更しなければ動作しないことに注意せよ。
+
+6. GAS の疑似命令「.ascii "Hello, World!"」によって何バイトが確保され
+   るかを答えよ。
+
+   #+begin_answer
+   13 バイト
+   #+end_answer
+
+7. GAS において、.data セクションに、(1) 0x12 の 1 バイト、(2) 256 バ
+   イトのゼロ、(3) 3 文字 "HEY" (終端文字なし)、(4) 3 文字 "BYE" (終端
+   文字あり)、(5) 16 ビットの符号なし整数 1 234、(6) 32 ビットの符号付
+   き整数 -57 890、(7) 単精度浮動小数点数の 1.2345 を確保するためには
+   それぞれどのように記述すればよいかを答えよ。
+
+   #+begin_answer
+   (1) .byte 0x12、
+   (2) .zero 256、
+   (3) .ascii "HEY"、
+   (4) .asciz "BYE"、
+   (5) .word 1234、
+   (6) .long -57890、
+   (7) .float 1.2345
+   #+end_answer
+
+8. [[sec:gas/syntax]] 節のプログラム ~add.s~ を、インテル構文に書き換えよ。
+
+   #+begin_answer
+   プログラムの例: ~add-intel.s~ (図 [[fig:gas/ex/add-intel.s]])
+   #+caption: gas/ex/add-intel.s
+   #+label: fig:gas/ex/add-intel.s
+   #+include: "code/gas/ex/add-intel.s" src raw
+   #+end_answer
+
+9. C 言語から機械語のプログラムを実行する方法 (図 [[fig:gas/c-cpuid.c]])は、
+   C 言語の関数ポインタを使えばより簡単に実現できる。以下のプログラム
+   ~c-cpuid-func.c~ (図 [[fig:gas/ex/c-cpuid-func.c]]) をコンパイルして実
+   行してみよ。その後、デバッガを使って、プログラム ~c-cpuid-func~ が
+   機械語のプログラムを実行するようすをトレースしてみよ。
+
+   #+caption: gas/ex/c-cpuid-func.c
+   #+label: fig:gas/ex/c-cpuid-func.c
+   #+include: "code/gas/ex/c-cpuid-func.c" src C
+
+   #+begin_answer
+   プログラム ~c-cpuid-func.c~ のコンパイルおよび実行の例:
+   #+begin_src sh
+   $ gcc -z execstack -o c-cpuid-func c-cpuid-func.c 
+   $ ./c-cpuid-func 
+   #+end_src
+   #+end_answer

@@ -1,0 +1,411 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* デバッガによるトレース: スタック
+<<ch:tr-stack>>
+
+** C 言語からアセンブリ言語へ
+<<sec:tr-stack/c-to-asm>>
+
+CPU がスタックを操作する様子を実際に見てみましょう。
+
+以下の C 言語で書かれたプログラムをエディタから入力し、
+~fact.c~ というファイル名で保存してください。
+基本的に、
+先ほどの階乗を計算するプログラム (図 [[fig:stack/fact.c]]) と同じです。
+ただし、
+関数 ~printf~ の呼び出しを削除し、
+8! ではなく 3! を計算するように変更しています。
+
+#+caption: tr-stack/fact.c
+#+label: fig:tr-stack/fact.c
+#+include: "code/tr-stack/fact.c" src C
+
+まず、
+~-S~ オプションを指定して GCC でコンパイルします。
+#+begin_src sh
+$ i686-linux-gnu-gcc-10 -S fno-pic -fomit-frame-pointer fact.c
+#+end_src
+
+GCC がどのようなアセンブリ言語のプログラムに変換したかを見てみましょう。
+例えば以下のようなアセンブリ言語のプログラム ~fact.s~ が生成されているはずです。
+
+#+caption: tr-stack/fact.s
+#+label: fig:tr-stack/fact.s
+#+include: "code/tr-stack/fact.s" src asm
+
+ドット (~.~) から始まる命令はアセンブラの疑似命令 (ディレクティブ) で、
+~.L~ から始まるラベルは局所ラベルでした。
+ここでは、
+簡単のため、
+疑似命令と局所ラベルの一部を削除します。
+
+#+caption: tr-stack/fact.ss-with-note
+#+label: fig:tr-stack/fact.ss-with-note
+#+include: "code/tr-stack/fact.ss-with-note" src asm
+
+プログラム中には、
+C 言語のプログラムのどの部分に対応するかをコメントとして記入しています。
+
+** デバッガの監視下でのプログラムの起動
+<<sec:tr-stack/dgb>>
+
+先ほどの C 言語で書かれたプログラム ~fact.c~ をコンパイルして、
+実行ファイル ~fact~ を生成します。
+#+begin_src sh
+$ gcc -fno-pic -fomit-frame-pointer -o fact fact.c
+#+end_src
+
+現在の作業ディレクトリに、
+以下の内容を書いたファイル ~.gdbinit~ を作成しておきます。
+
+#+caption: tr-stack/.gdbinit
+#+label: fig:tr-stack/.gdbinit
+#+include: "code/tr-stack/.gdbinit" src gdb
+
+ここでは、
+~.gdbinit~ ファイルに ~break *main~ と記述し、
+関数 ~main~ にブレークポイントを設定しています。
+
+実行ファイル名 ~fact~ を指定して、
+GDB を起動します。
+run コマンドを実行して、
+プログラム ~fact~ を実行します。
+ブレークポイントを設定しているので、
+関数 ~main~ に入ったところで停止します。
+
+#+begin_src gdb
+(gdb) r
+Starting program: /home/asm/code/tr-stack/fact
+
+Breakpoint 1, 0x004011b6 in main ()
+1: /x $pc = 0x4011b6
+2: /x $esp = 0xbffffadc
+3: x/32xb $esp
+0xbffffadc:	0x41	0xfb	0xdf	0xb7	0x01	0x00	0x00	0x00
+0xbffffae4:	0x74	0xfb	0xff	0xbf	0x7c	0xfb	0xff	0xbf
+0xbffffaec:	0x04	0xfb	0xff	0xbf	0x01	0x00	0x00	0x00
+0xbffffaf4:	0x00	0x00	0x00	0x00	0x00	0xf0	0xfb	0xb7
+4: x/4i $pc
+=> 0x4011b6 <main>:	lea    0x4(%esp),%ecx
+   0x4011ba <main+4>:	and    $0xfffffff0,%esp
+   0x4011bd <main+7>:	pushl  -0x4(%ecx)
+   0x4011c0 <main+10>:	push   %ebp
+(gdb)
+#+end_src
+
+さあ、
+ここからが本番です。
+CPU の内部動作をじっくり追いかけましょう。
+
+** デバッガからの出力を理解する
+<<sec:tr-stack/understand-output>>
+
+デバッガの起動時に実行される ~.gdbinit~ ファイルにコマンドをいくつか記述したので、
+レジスタやメモリの内容が表示されています。
+
+#+begin_src gdb
+1: /x $pc = 0x4011b6
+#+end_src
+は現在のプログラムカウンタの値を 16 進数で表示しています。
+
+その下の
+#+begin_src gdb
+2: /x $esp = 0xbffffabc
+#+end_src
+はスタックポインタ (レジスタ ESP) の値を 16 進数で表示しています。
+現在、
+スタックの一番上が 0xbfff fabc 番地であることを意味しています。
+
+さらにその下の
+#+begin_src gdb
+3: x/32xb $esp
+0xbffffabc:	0x41	0xfb	0xdf	0xb7	0x01	0x00	0x00	0x00
+0xbffffac4:	0x54	0xfb	0xff	0xbf	0x5c	0xfb	0xff	0xbf
+0xbffffacc:	0xe4	0xfa	0xff	0xbf	0x01	0x00	0x00	0x00
+0xbffffad4:	0x00	0x00	0x00	0x00	0x00	0xf0	0xfb	0xb7
+#+end_src
+は、
+スタックポインタの指すアドレスから、
+32 バイト分のメモリの内容を 16 進数でダンプしています。
+
+スタックの中にすでにいろいろな値が格納されています。
+現在、
+スタックの一番上が 0xbfff fabc です。
+したがって、
+例えば、
+もしこの時点で \inst{pop %eax} を実行すれば、
+レジスタ EAX に (メモリの 0xbfff fabc 番地に格納されている) 0xb7df fb41 が格納されます。
+その後、
+レジスタ ESP の値が 0xbfff fac0 (= 現在のスタックポインタの値 + 4 バイト) に変化します。
+
+最後の、
+#+begin_src gdb
+=> 0x4011b6 <main>:	lea    0x4(%esp),%ecx
+   0x4011ba <main+4>:	and    $0xfffffff0,%esp
+   0x4011bd <main+7>:	pushl  -0x4(%ecx)
+   0x4011c0 <main+10>:	push   %ebp
+#+end_src
+は、
+プログラムカウンタから 4 命令を逆アセンブルした結果を表示しています。
+
+プログラムカウンタ ~$pc~ は、
+次に実行される命令が格納されているメモリのアドレスを差しています。
+現在のプログラムカウンタの値が 0x40 11b4 で、
+1 行目 (0x40 11b6 から始まる行) の先頭に矢印 (~=>~) が表示されています。
+この矢印が、
+次に実行される命令を表しています。
+
+** 関数呼び出しのトレース
+<<sec:tr-stack/tr-funcall>>
+
+C 言語で書かれたプログラムにおいて、
+関数 ~fact~ を呼び出している行
+#+begin_src c
+  n = fact(3);
+#+end_src
+に対応するのは、
+アセンブリ言語プログラムの以下の箇所です。
+#+begin_src asm
+        pushl   $3
+        call    fact
+#+end_src
+関数 ~fact~ を呼び出すために、
+スタックに引数 3 を積み、
+関数 ~fact~ を呼び出しています。
+
+GDB の si コマンド (stepi コマンドの省略形) を 8 回ほど実行して、
+\inst{pushl $3} という命令の直前まで進めます (紙面の都合上、
+途中の実行結果は省略します)。
+#+begin_src gdb
+0x004011ca in main ()
+1: /x $pc = 0x4011ca
+2: /x $esp = 0xbffffaa4	← 現在のスタックポインタの値
+3: x/32xb $esp	↓ 現在のスタックの中身
+0xbffffaa4:	0x00	0x40	0x40	0x00	0x7c	0xfb	0xff	0xbf
+0xbffffaac:	0x33	0x12	0x40	0x00	0x01	0x00	0x00	0x00
+0xbffffab4:	0x74	0xfb	0xff	0xbf	0x7c	0xfb	0xff	0xbf
+0xbffffabc:	0x0b	0x12	0x40	0x00	0x20	0x65	0xfe	0xb7
+4: x/4i $pc
+=> 0x4011ca <main+20>:	push   $0x3	← 次に実行される命令 (3 をスタックに積む)
+   0x4011cc <main+22>:	call   0x401189 <fact>
+   0x4011d1 <main+27>:	add    $0x10,%esp
+   0x4011d4 <main+30>:	mov    %eax,-0xc(%ebp)
+(gdb)
+#+end_src
+
+#+begin_note
+GDB では、
+プロンプトでリターンキーを繰り返し押すことで、
+直前のコマンドを何度も繰り返して実行することができます。
+他にも、
+stepi コマンドであれば
+#+begin_src gdb
+(gdb) si 8
+#+end_src
+のように繰り返し回数を指定することもできます。
+#+end_note
+
+#+begin_note
+GDB の逆アセンブル結果では、
+\inst{pushl $3} ではなく、
+\inst{push $0x3} のように数値が 16 進数で表記されるなど、
+表記が少し異なっていることに注意してください。
+#+end_note
+
+最初の命令は \inst{push $0x3} です。
+3 という 32 ビットの整数が、
+スタックにプッシュされるはずです。
+スタックポインタの値が 4 減り、
+32 ビットの整数 3 がスタックの一番上に積まれるはずです。
+つまり、
+レジスタ ESP の値が 0xbfff faa4 から 4 減少し、
+0xbffffaa0 から 4 バイトに 32 ビットの整数 3 が書き込まれるはずです。
+
+GDB の si コマンドを引き続き実行して、
+\inst{push $0x3} をステップ実行します。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x004011cc in main ()
+1: /x $pc = 0x4011cc
+2: /x $esp = 0xbffffaa0	← レジスタ ESP の値が -4 した
+3: x/32xb $esp	↓ スタックの一番上に 0x0000 0003 が積まれた
+0xbffffaa0:	0x03	0x00	0x00	0x00	0x00	0x40	0x40	0x00
+0xbffffaa8:	0x7c	0xfb	0xff	0xbf	0x33	0x12	0x40	0x00
+0xbffffab0:	0x01	0x00	0x00	0x00	0x74	0xfb	0xff	0xbf
+0xbffffab8:	0x7c	0xfb	0xff	0xbf	0x0b	0x12	0x40	0x00
+4: x/4i $pc
+=> 0x4011cc <main+22>:	call   0x401189 <fact>	← 関数呼び出し
+   0x4011d1 <main+27>:	add    $0x10,%esp
+   0x4011d4 <main+30>:	mov    %eax,-0xc(%ebp)
+   0x4011d7 <main+33>:	mov    $0x0,%eax
+(gdb)
+#+end_src
+予想どおり、
+レジスタ ESP の値が 0xbfff faa4 から 0xbfff faa0 に 4 減少しています。
+また、
+0xbfff faa0 番地から 4 バイトに、
+32 ビット整数の 3 (リトルエンディアンで、
+0x03、
+0x00、
+0x00、
+0x00 の 4 バイト) が格納されています。
+
+次は、
+\inst{call 0x401189 <fact>} というサブルーチン呼び出しです。
+ここで、
+0x40 1189 番地は、
+(C 言語で書いた) 関数 ~fact~ の開始番地です。
+
+先ほど見たように、
+この時点で、
+スタックポインタの値は 0xbfff faa0 です。
+スタックの先頭に、
+すでに引数である 3 (リトルエンディアンで 0x03、
+0x00、
+0x00、
+0x00) が積まれている状態です。
+
+CALL 命令を実行すると、
+1. リターンアドレスがスタックに積まれる
+2. 関数の開始番地にジャンプする (プログラムカウンタが関数の開始番地に
+   なる)
+はずです。
+具体的には、
+1. リターンアドレスである 0x40 11d1 (\inst{call 0x401189 <fact>}の
+   次の命令が格納されているアドレス) がスタックに積まれる
+2. プログラムカウンタが 0x40 1189 (関数 ~fact~ の開始番地) になる
+となるはずです。
+
+1 命令分ステップ実行します。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x00401189 in fact ()
+1: /x $pc = 0x401189	← 関数の開始アドレスにジャンプしている
+2: /x $esp = 0xbffffa9c	←レジスタ ESP の値が -4 された
+3: x/32xb $esp	↓ スタックの一番上にリターンアドレスが積まれた
+0xbffffa9c:	0xd1	0x11	0x40	0x00	0x03	0x00	0x00	0x00
+0xbffffaa4:	0x00	0x40	0x40	0x00	0x7c	0xfb	0xff	0xbf
+0xbffffaac:	0x33	0x12	0x40	0x00	0x01	0x00	0x00	0x00
+0xbffffab4:	0x74	0xfb	0xff	0xbf	0x7c	0xfb	0xff	0xbf
+4: x/4i $pc
+=> 0x401189 <fact>:	sub    $0xc,%esp	← レジスタ ESP を -12 する
+   0x40118c <fact+3>:	cmpl   $0x1,0x10(%esp)
+   0x401191 <fact+8>:	jne    0x40119a <fact+17>
+   0x401193 <fact+10>:	mov    $0x1,%eax
+(gdb)
+#+end_src
+確かに期待どおりに動作しています。
+レジスタ ESP が -4 され、
+スタックの一番上にリターンアドレス 0x40 11d1 (リトルエンディアンで 0xd1、
+0x11、
+0x40、
+0x00) が格納されていることがわかります。
+その直後に、
+先ほどスタックの一番上に格納されていた引数 (0x03、
+0x00、
+0x00、
+0x00) が続いていることがわかります。
+また、
+プログラムカウンタの値は、
+関数の開始アドレスである 0x40 1189 に変化しています。
+
+続いて、
+呼び出された関数側で、
+引数をどのように取り出しているか見てみましょう。
+
+次に実行される命令は \inst{sub $0xc,%esp} です。
+これによってレジスタ ESP の値が 12 減少します。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x0040118c in fact ()
+1: /x $pc = 0x40118c
+2: /x $esp = 0xbffffa90	← レジスタ ESP の値が -12 された
+3: x/32xb $esp
+0xbffffa90:	0x00	0xf0	0xfb	0xb7	0x00	0xf0	0xfb	0xb7
+0xbffffa98:	0x00	0x00	0x00	0x00	0xd1	0x11	0x40	0x00
+0xbffffaa0:	0x03	0x00	0x00	0x00	0x00	0x40	0x40	0x00
+0xbffffaa8:	0x7c	0xfb	0xff	0xbf	0x33	0x12	0x40	0x00
+4: x/4i $pc
+=> 0x40118c <fact+3>:	cmpl   $0x1,0x10(%esp)	← C 言語の「if (n == 1)」に相当
+   0x401191 <fact+8>:	jne    0x40119a <fact+17>
+   0x401193 <fact+10>:	mov    $0x1,%eax
+   0x401198 <fact+15>:	jmp    0x4011b2 <fact+41>
+(gdb)
+#+end_src
+
+次の命令が \inst{cmpl $0x1,0x10(%esp)} です。
+C 言語のプログラムの
+#+begin_src C
+  if (n == 1)
+#+end_src
+に該当します。
+関数の呼び出し元から渡された引数 ~n~ の値が、
+1 と等しいかどうかをチェックしています。
+
+CMP は比較 (compare) 命令です。
+~$0x1~ (整数 1) と ~0x10(%esp)~ (「ESP レジスタの値 + 0x10」番地の値) を比較します。
+比較した結果はフラグレジスタに保存されます (フラグレジスタの値は表示していないので、
+GDB の出力は何も変化しません)。
+
+つまり、
+~0x10(%esp)~ が変数 ~n~ の値を表していることになります。
+上の出力をよく見てみると、
+スタックの内容が以下のように表示されています。
+#+begin_src gdb
+3: x/32xb $esp
+0xbffffa90:	0x00	0xf0	0xfb	0xb7	0x00	0xf0	0xfb	0xb7
+0xbffffa98:	0x00	0x00	0x00	0x00	0xd1	0x11	0x40	0x00
+0xbffffaa0:	0x03	0x00	0x00	0x00	0x00	0x40	0x40	0x00
+0xbffffaa8:	0x7c	0xfb	0xff	0xbf	0x33	0x12	0x40	0x00
+#+end_src
+「スタックの一番上のアドレス = レジスタ ESP の値」が 0xbfff fa90 です。
+「レジスタ ESP の値 + 0x10」は 0xbfff faa0 です。
+0xbfff faa0 番地をよく見てみると、
+0x03、
+0x00、
+0x00、
+0x00 の 4 バイトが格納されています。
+
+このことからも、
+呼び出された関数側では、
+スタックに積まれている値を取り出すことによって、
+関数に渡された引数を取り出せていることがわかります。
+
+** 章末問題
+<<sec:tr-stack/quiz>>
+
+1. プログラム ~fact.c~ (図 [[fig:tr-stack/fact.c]]) 中の 「~n * fact(n -
+   1)~」を 「~n + fact(n - 1)~」 に変更し、本章と同じ手順でプログラム
+   動作をトレースせよ。
+
+2. バイナリエディタを用いて実行ファイル ~fact~ を改変することで、$5!$
+   を計算せよ。
+
+   #+begin_answer
+   関数 ~main~ 中の \inst{pushl $3} を \inst{pushl $0x05} に書き換えればよい。
+   \inst{pushl $3} の機械語は 0x6a、
+   0x03 であるから、
+   これを 0x6a、
+   0x05 に書き換えればよい。
+   #+end_answer
+
+3. GDB の where コマンドを使用すれば、プログラム実行中のスタックフレー
+   ムを表示できる。GDB のドキュメントを読んで、where コマンドを使い方
+   を習得せよ。その後、プログラム ~add~ のトレース中に where コマンド
+   を実行し、スタックフレームの変化を分析せよ。

@@ -1,0 +1,413 @@
+# -*- Org -*-
+# 
+# Copyright (c) 2021, Hiroyuki Ohsaki.
+# All rights reserved.
+# 
+
+# This document is licensed under a Creative Commons
+# Attribution-NonCommercial-ShareAlike 4.0 International License (CC
+# BY-NC-SA 4.0).
+
+# This document is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Creative Commons License for more details.
+
+# You should have received a copy of the license along with this work.
+# If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+
+* デバッガによるトレース: メモリアクセス
+<<ch:tr-mem>>
+
+** C 言語とアセンブリ言語の対応分析
+<<sec:tr-mem/asm-matching>>
+
+CPU がメモリにアクセスするようすを実際に見てみましょう。
+
+以下の C 言語で書かれたプログラムをエディタから入力し、
+~add.c~ というファイル名で保存します (図 [[fig:tr-mem/add.c]])。
+
+#+caption: tr-mem/add.c
+#+label: fig:tr-mem/add.c
+#+include: "code/tr-mem/add.c" src C
+
+[[ch:tr-regs]] 章の ~add.c~ とほぼ同じプログラムです。
+ただし、
+変数 ~i~, ~j~ を *自動変数 (automatic variable)* ではなく、
+*大域変数 (global variable)* として定義しています。
+
+まず、
+~-S~ オプションを指定して GCC でコンパイルします。
+#+begin_src sh
+$ gcc -S -fno-pic -fomit-frame-pointer add.c
+#+end_src
+
+GCC がどのようなアセンブリ言語のプログラムに変換したかを見てみましょう。
+例えば以下のようなアセンブリ言語のプログラム ~add.s~ が生成されているはずです (図 [[fig:tr-mem/add.s]])。
+
+#+caption: tr-mem/add.s
+#+label: fig:tr-mem/add.s
+#+include: "code/tr-mem/add.s" src asm
+
+ドット (~.~) から始まる命令はアセンブラの *疑似命令 (ディレクティブ)* です。
+~.L~ から始まるラベルは局所ラベルです。
+今はこれらをすべて削除します (図 [[fig:tr-mem/add.ss]])。
+
+#+caption: tr-mem/add.ss
+#+label: fig:tr-mem/add.ss
+#+include: "code/tr-mem/add.ss" src asm
+
+上の例では、
+~i~ と ~j~ は *シンボル (symbol)* です。
+それぞれ変数 ~i~ および ~j~ が格納されているメモリのアドレスを意味します。
+あくまでアセンブラが解釈するシンボルです。
+すべてのシンボルは定数に置き換えられます。
+したがって ~i~ は、
+例えば 0x5655 901c のような数値と同じ意味になります。
+
+C 言語で書かれたプログラム ~add.c~ と、
+GCC の生成したアセンブリ言語のプログラム ~add.s~ をじっくり比較すると、
+以下のような対応になっていることがわかります (図 [[fig:add.ss-with-note]])。
+
+#+caption: add.ss-with-note
+#+label: fig:add.ss-with-note
+#+include: "code/tr-mem/add.ss-with-note" src asm
+
+まず、
+メモリのアドレス ~i~ に 123 を格納し、
+その後、
+その値を 1 だけ増加しています。
+メモリのアドレス ~j~ に 456 を格納し、
+その後、
+その値に、
+アドレス ~i~ に格納されている値を加算しています。
+
+** デバッガの監視下でのプログラムの起動
+<<sec:tr-mem/dgb>>
+
+本当にこのように動作するか、
+デバッガを用いて CPU の内部動作を見てみます。
+
+先ほどの C 言語で書かれたプログラム ~add.c~ をコンパイルして、
+実行ファイル ~add~ を生成します。
+#+begin_src sh
+$ gcc -fno-pic -fomit-frame-pointer -o add add.c
+#+end_src
+
+現在の作業ディレクトリに、
+以下の内容を書いたファイル ~.gdbinit~ を作成しておきます (図 [[fig:tr-mem/.gdbinit]])。
+
+#+caption: tr-mem/.gdbinit
+#+label: fig:tr-mem/.gdbinit
+#+include: "code/tr-mem/.gdbinit" src gdb
+
+ここで ~&i~ および ~&j~ は、
+変数 ~i~ および変数 ~j~ が格納されているメモリのアドレスを意味します。
+~display /4xb~ は、
+指定されたアドレスから 4 バイトを、
+バイト (~b~) 単位で、
+16 進数フォーマット (~x~) で表示することを意味しています。
+
+実行ファイル名 ~ex~ を指定して、
+GDB を起動します。
+#+begin_src gdb
+$ gdb -q add
+Reading symbols from add...
+(No debugging symbols found in add)
+Breakpoint 1 at 0x1189
+(gdb) 
+#+end_src
+
+** プログラムの開始とブレークポイントでの停止
+<<sec:tr-mem/dbg-run>>
+
+早速、
+プログラム ~add~ をデバッガの監視下で実行します。
+#+begin_src gdb
+(gdb) r
+Starting program: /home/ohsaki/code/tr-mem/add 
+
+Breakpoint 1, 0x56556189 in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $edx = 0xffffd524
+3: x/4xb &i
+0x5655901c <i>: 0x00    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0x00    0x00    0x00    0x00
+5: x/4i $pc
+=> 0x56556189 <main>:   movl   $0x7b,0x5655901c ← 0x7b は 10 進数で 123、0x5655 901c は変数 i のアドレス
+   0x56556193 <main+10>:        mov    0x5655901c,%eax
+   0x56556198 <main+15>:        add    $0x1,%eax
+   0x5655619b <main+18>:        mov    %eax,0x5655901c
+(gdb) 
+#+end_src
+
+~.gdbinit~ ファイルに設定を書いておいたため、
+GDB のプロンプトが表示されるたびに、
+~display~ コマンドが実行されます。
+デバッガの出力の見方は、
+基本的に [[ch:tr-regs]] 章と同じです。
+上から順に、
+レジスタ EAX および EDX の値です。
+その下の、
+#+begin_src gdb
+3: x/4xb &i
+0x5655901c <i>: 0x00    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0x00    0x00    0x00    0x00
+#+end_src
+は、
+変数 ~i~ が格納されているアドレスから 4 バイトのメモリダンプ、
+変数 ~j~ が格納されているアドレスから 4 バイトのメモリダンプです。
+最後は、
+プログラムカウンタが差すアドレスから 4 命令の逆アセンブル結果です。
+
+32 ビット環境向けにコンパイルしたプログラムなので、
+C 言語における ~int~ 型の大きさは 32 ビット (= 4 バイト) です。
+変数 ~i~ は 0x5655 901c 番地から 4 バイトに格納されていて、
+初期状態ではゼロになっています。
+同様に、
+変数 ~j~ は 0x5655 9020 番地から 4 バイトに格納されていて、
+初期状態ではこれもゼロになっています。
+
+** CPU のメモリアクセスの追跡
+<<sec:tr-mem/trace-mem>>
+
+~si~ コマンド (~stepi~ コマンドの省略形) を実行して、
+一命令ずつステップ実行します。
+最初の命令は \inst{movl $0x7b, 0x5655901c} です。
+#+begin_src gdb
+(gdb) si
+0x56556193 in main ()
+1: /x $eax = 0xf7fc2ae8
+2: /x $edx = 0xffffd524
+3: x/4xb &i
+0x5655901c <i>: 0x7b    0x00    0x00    0x00 ← メモリに 0x0000 007b が格納された
+4: x/4xb &j
+0x56559020 <j>: 0x00    0x00    0x00    0x00
+5: x/4i $pc
+=> 0x56556193 <main+10>:        mov    0x5655901c,%eax
+   0x56556198 <main+15>:        add    $0x1,%eax
+   0x5655619b <main+18>:        mov    %eax,0x5655901c
+   0x565561a0 <main+23>:        movl   $0x1c8,0x56559020
+(gdb) 
+#+end_src
+0x7b (10 進数で 123) がメモリの 0x5655 901c 番地に書き込まれました。
+0x5655 901c 番地からのメモリダンプが 0x7b 0x00 0x00 0x00 となっています。
+16 進数で 0x0000 007b です。
+インテルの IA-32 アーキテクチャの CPU はリトルエンディアン ([[sec:mem/endianness]] 節) なので、
+下位バイトが先に来ています。
+
+さらに 3 命令ほどステップ実行してみましょう。
+まず、
+\inst{mov 0x5655901c, %eax} が実行されます。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x56556198 in main ()
+1: /x $eax = 0x7b ← レジスタ EAX に変数 i が格納された
+2: /x $edx = 0xffffd524
+3: x/4xb &i
+0x5655901c <i>: 0x7b    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0x00    0x00    0x00    0x00
+5: x/4i $pc
+=> 0x56556198 <main+15>:        add    $0x1,%eax ← レジスタ EAX を +1 する
+   0x5655619b <main+18>:        mov    %eax,0x5655901c
+   0x565561a0 <main+23>:        movl   $0x1c8,0x56559020
+   0x565561aa <main+33>:        mov    0x5655901c,%edx
+(gdb) 
+#+end_src
+レジスタ EAX の値が 0xf7fc2ae8 という (よくわからない) 値から 0x7b (= 123) に変化しました。
+
+次の命令は \inst{add $0x1,%eax} です。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x5655619b in main ()
+1: /x $eax = 0x7c ←  EAX レジスタの値が 1 増加した
+2: /x $edx = 0xffffd524
+3: x/4xb &i
+0x5655901c <i>: 0x7b    0x00    0x00    0x00 ← mov する前は 0x0000 007b (= 123)
+4: x/4xb &j
+0x56559020 <j>: 0x00    0x00    0x00    0x00
+5: x/4i $pc
+=> 0x5655619b <main+18>:        mov    %eax,0x5655901c ← レジスタ EAX の値を変数 i に格納する
+   0x565561a0 <main+23>:        movl   $0x1c8,0x56559020
+   0x565561aa <main+33>:        mov    0x5655901c,%edx
+   0x565561b0 <main+39>:        mov    0x56559020,%eax
+(gdb) 
+#+end_src
+レジスタ EAX の値が 0x7b から 0x7c に 1 だけ増加しました。
+
+次の命令は \inst{mov %eax, 0x5655901c} です。
+0x5655 901c は変数 ~i~ が格納されているメモリのアドレスです。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561a0 in main ()
+1: /x $eax = 0x7c
+2: /x $edx = 0xffffd524
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00 ← 0x0000 007c (= 124) が格納された
+4: x/4xb &j
+0x56559020 <j>: 0x00    0x00    0x00    0x00
+5: x/4i $pc
+=> 0x565561a0 <main+23>:        movl   $0x1c8,0x56559020 ← 0x1c8 は 10 進数で 456、0x5655 9020 は変数 j のアドレス
+   0x565561aa <main+33>:        mov    0x5655901c,%edx
+   0x565561b0 <main+39>:        mov    0x56559020,%eax
+   0x565561b5 <main+44>:        add    %edx,%eax
+(gdb) 
+#+end_src
+レジスタ EAX の値を、
+再度メモリの 0x5655 901c 番地に書き込んでいます。
+0x5655 901c 番地からのメモリダンプの内容が 0x7c、
+0x00、
+0x00、
+0x00 となっていて、
+メモリに格納されている値が更新されていることがわかります。
+
+さらにもう少し先まで動作を追いかけてみましょう。
+#+begin_src gdb
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561aa in main ()
+1: /x $eax = 0x7c
+2: /x $edx = 0xffffd524
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0xc8    0x01    0x00    0x00 ← 変数 j に 0x0000 01c8 (= 456) が格納された
+5: x/4i $pc
+=> 0x565561aa <main+33>:        mov    0x5655901c,%edx ← 0x5655 901c は変数 i のアドレス
+   0x565561b0 <main+39>:        mov    0x56559020,%eax
+   0x565561b5 <main+44>:        add    %edx,%eax
+   0x565561b7 <main+46>:        mov    %eax,0x56559020
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561b0 in main ()
+1: /x $eax = 0x7c
+2: /x $edx = 0x7c ← レジスタ EDX に変数 j が読み込まれた
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0xc8    0x01    0x00    0x00
+5: x/4i $pc
+=> 0x565561b0 <main+39>:        mov    0x56559020,%eax ← 0x5655 9020 は変数 j のアドレス
+   0x565561b5 <main+44>:        add    %edx,%eax
+   0x565561b7 <main+46>:        mov    %eax,0x56559020
+   0x565561bc <main+51>:        mov    0x56559020,%eax
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561b5 in main ()
+1: /x $eax = 0x1c8 ← レジスタ EAX に変数 j の値が格納された
+2: /x $edx = 0x7c
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0xc8    0x01    0x00    0x00
+5: x/4i $pc
+=> 0x565561b5 <main+44>:        add    %edx,%eax ← レジスタ EAX にレジスタ EDX の値を加算する
+   0x565561b7 <main+46>:        mov    %eax,0x56559020
+   0x565561bc <main+51>:        mov    0x56559020,%eax
+   0x565561c1 <main+56>:        ret    
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561b7 in main ()
+1: /x $eax = 0x244 ← レジスタ EAX にレジスタ EDX の値が加算された
+2: /x $edx = 0x7c
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0xc8    0x01    0x00    0x00
+5: x/4i $pc
+=> 0x565561b7 <main+46>:        mov    %eax,0x56559020 ← 0x5655 9020 は変数 j のアドレス
+   0x565561bc <main+51>:        mov    0x56559020,%eax
+   0x565561c1 <main+56>:        ret    
+   0x565561c2:  xchg   %ax,%ax
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561bc in main ()
+1: /x $eax = 0x244
+2: /x $edx = 0x7c
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0x44    0x02    0x00    0x00 ← 変数 j にレジスタ EAX の値が格納された
+5: x/4i $pc
+=> 0x565561bc <main+51>:        mov    0x56559020,%eax
+   0x565561c1 <main+56>:        ret    
+   0x565561c2:  xchg   %ax,%ax
+   0x565561c4:  xchg   %ax,%ax
+(gdb) ← リターンキーを押す (stepi コマンドの繰り返し)
+0x565561c1 in main ()
+1: /x $eax = 0x244 ← すでに 0x244 であったため変化なし
+2: /x $edx = 0x7c
+3: x/4xb &i
+0x5655901c <i>: 0x7c    0x00    0x00    0x00
+4: x/4xb &j
+0x56559020 <j>: 0x44    0x02    0x00    0x00
+5: x/4i $pc
+=> 0x565561c1 <main+56>:        ret    
+   0x565561c2:  xchg   %ax,%ax
+   0x565561c4:  xchg   %ax,%ax
+   0x565561c6:  xchg   %ax,%ax
+(gdb)
+#+end_src
+
+まず、
+変数 ~j~ が格納されている 0x5655 9020 番地に 0x0000 01c8 (= 456) が格納されます。
+さらに、
+レジスタ EDX に、
+0x5655 901c 番地に格納されている値 (変数 ~i~ の値) が読み込まれ、
+レジスタ EAX に 0x5655 9020 番地に格納されている値 (変数 ~j~ の値) が読み込まれます。
+その後、
+レジスタ EDX の値がレジスタ EAX に加算され、
+レジスタ EAX の値が 0x5655 9020 番地に格納されています。
+最後に、
+0x5655 9020 番地に格納されている値がレジスタ EAX に読み込まれています。
+
+** CPU の抽象モデルによる理解
+<<sec:tr-mem/cpu-modeling>>
+
+より理解を深めるために、
+~add.s~ の計算部分を、
+[[sec:mem/cpu-model]] 節の CPU の抽象モデルで記述してみます。
+#+begin_src asm
+# i = 123
+[0x5655901c]	← 123
+eax		← [0x5655901c]
+# i = i + 1
+eax		← <+> 1
+[0x5655901c]	← eax
+# j = 456
+[0x56559020]	← 456
+# j = i + j
+edx		← [0x5655901c]
+eax		← [0x56559020]
+eax		← <+> edx
+[0x40401c]	← eax
+#+end_src
+
+このように、
+非常に単純な処理の組み合わせになっていることがわかります。
+IA-32 アーキテクチャのような最新の CPU であっても、
+やはりフォン・ノイマン・アーキテクチャが基礎となっています。
+レジスタへの代入、
+メモリの読み書き、
+ALU による算術演算・論理演算といった、
+単純な処理の組み合わせによって複雑な処理が実現されていることがわかります。
+
+** 章末問題
+<<sec:tr-mem/quiz>>
+
+1. プログラム ~add.c~ (図 [[fig:tr-mem/add.c]])の関数 ~main~ 内に、変数
+   ~i~ や ~j~ に対する四則演算をいくつか自由に追加し、GCC によって生成
+   されたアセンブリ言語プログラムを分析せよ。また、実行ファイル ~add~
+   を生成し、本章で説明した手順のようにトレースしてみよ。
+
+2. プログラム ~add~ を GDB の監視下で実行し、変数 ~i~ が格納されている
+   メモリのアドレスを調査せよ。変数 ~i~ が 32 ビットのメモリ空間のどの
+   あたりに配置されているかを答えよ。
+
+3. プログラム ~add~ を GDB の監視下で複数回実行し、変数 ~i~ のメモリの
+   アドレスが実行のたびにどのように変化するか (もしくは変化しないか)を
+   調査せよ。
+
+4. GDB のウォッチポイント (watch point) を使えば、レジスタの値やメモリ
+   に格納されている値が変化した時にプログラムの実行を一時停止できる。
+   ウォッチポイントを使用して、プログラム ~add~ の動作をトレースしてみ
+   よ。具体的には、変数 ~i~ や ~j~ にウォッチポイントを設定し、
+   continueコマンドを繰り返し実行せよ。
