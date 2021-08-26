@@ -4,7 +4,7 @@
 
 ## このドキュメントについて
 
-「はじめに」 (https://github.com/h-ohsaki/modern-asm/blob/master/01_intro.org) をご覧ください。
+まず、「[はじめに](01_intro.org)」をご覧ください。
 
 本書は、
 Emacs の org ファイルで書かれています。
