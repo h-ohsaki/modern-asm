@@ -42,6 +42,6 @@ If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
 
 本書で使用しているツールやライブラリ一式をインストールした Docker コンテナを、
 Docker Hub 上で公開しています。
-詳細については以下を参照してください。
+詳細については [Docker.md](Docker.md) を参照してください。
 
-https://github.com/h-ohsaki/modern-asm/blob/master/Docker.md
+
