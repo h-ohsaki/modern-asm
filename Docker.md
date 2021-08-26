@@ -64,6 +64,10 @@ Hello, World!
 root@34efbca5c9d8:/home/asm/code/asm# ^D ← ← コンテナを終了
 ```
 
+`--rm` オプションを指定しているため、
+コンテナ上の bash を終了すると、
+コンテナ自体も削除されます。
+
 Docker コンテナの性質上、
 コンテナを終了すると、
 作成・変更したファイルはすべて消えてしまいます。
@@ -107,3 +111,9 @@ asm@62c8e5e3ae2c:~/code/asm$ gcc -o hello hello.c
 asm@62c8e5e3ae2c:~/code/asm$ ./hello 
 Hello, World!
 ```
+
+~-d~ オプションを指定して、
+デーモンモードでコンテナを起動しているため、
+コンテナの SSH セッションを終了 (つまりログアウト) しても、
+Docker コンテナは動作し続けています。
+Docker コンテナを停止するには、`docker rm` を使ってください。
