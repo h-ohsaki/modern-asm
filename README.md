@@ -13,7 +13,8 @@
 
 ## License
 
-This document is licensed under a Creative Commons
+Modern Assembly Language Programming (モダン アセンブリ言語プログラミ
+ング) is licensed under a Creative Commons
 Attribution-NonCommercial-ShareAlike 4.0 International License (CC
 BY-NC-SA 4.0).
 
