@@ -833,7 +833,8 @@ PCS (Procedure Call Standard) \cite{Arm:PCS} と呼ばれています。
    UNIX 系オペレーティングシステムにおけるユーザレベルの上限は、
    例えば ~ulimit~ コマンドで確認できる。
 
-#+begin_src raw
+#+begin_src sh
+$ ulimit -a
 Maximum size of core files created                           (kB, -c) 0
 Maximum size of a process’s data segment                     (kB, -d) unlimited
 Maximum size of files created by the shell                   (kB, -f) unlimited
