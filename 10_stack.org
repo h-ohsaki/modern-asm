@@ -474,7 +474,7 @@ $f(x)$ の値は、
 
 例えば、階乗
 \begin{align}
-  n! = n \cdot (n - 1) \cdot \cdots \cdot 2 \cdot 1
+  n! = n \cdot (n - 1) \cdot \dots \cdot 2 \cdot 1
 \end{align}
 を計算するプログラムを C 言語で書くと以下のようになります (図 [[fig:stack/fact.c]])。
 
