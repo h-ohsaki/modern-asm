@@ -18,4 +18,4 @@ main:
 	fstpl	z
 	# return 0
 	movl	$0, %eax		# EAX ← 0
-	ret				# PC ← [ESP]; ESP ← <+> 4
+	ret				# PC ← [ESP], ESP ← <+> 4

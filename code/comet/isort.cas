@@ -15,8 +15,8 @@ INNER	CPA	GR2, =0		; j > 0 なら続ける
 	JMI	NEXT
 	JZE	NEXT
 	LAD	GR3, -1, GR2	; GR3 ← j - 1
-	LD	GR0, A, GR3	; GR0 ← a[j-1]
-	CPA	GR0, A, GR2	; A[j - 1] > a[j] なら続ける
+	LD	GR0, A, GR3	; GR0 ← A[j-1]
+	CPA	GR0, A, GR2	; A[j - 1] > A[j] なら続ける
 	JMI	NEXT
 	JZE	NEXT
 	
@@ -25,7 +25,7 @@ INNER	CPA	GR2, =0		; j > 0 なら続ける
 	LAD	GR3, -1, GR2	; GR3 ← j - 1
 	LD	GR4, A, GR3
 	ST	GR4, A, GR2	; A[j] = A[j - 1]
-	ST	GR0, A, GR3	; a[j - 1] = tmp
+	ST	GR0, A, GR3	; A[j - 1] = tmp
 	LAD	GR2, -1, GR2	; 内側のループインデックス j を -1
 	JUMP	INNER
 		

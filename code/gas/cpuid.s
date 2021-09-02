@@ -5,5 +5,5 @@ _start:
 	cpuid
 	movl	%edx,%ebx # レジスタ EDX の値をレジスタ EBX にコピー
 	shrl	$24,%ebx  # 24 ビット右シフト
-	movl	$1,%eax   # システムコール 2 番は exit
+	movl	$1,%eax   # システムコール 1 番は exit
 	int	$0x80     # システムコール呼び出し

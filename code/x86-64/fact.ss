@@ -3,7 +3,7 @@ fact:
         pushq   %rbx                    # RSP ← <-> 8, [RSP] ← RBX
         movl    %edi, %ebx              # EBX ← EDI
 	## if (n == 1)
-        cmpl    $1, %edi                # 1 == EDI?
+        cmpl    $1, %edi                # EDI == 1?
         jne     .L4                     # RIP ← .L4
 .L2:
 	## return

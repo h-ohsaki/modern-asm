@@ -21,8 +21,8 @@ INNER	CPA	j, =0		; j > 0 なら続ける
 	JMI	NEXT
 	JZE	NEXT
 	LAD	j_min1, -1, j	; j_min1 ← j - 1
-	LD	tmp, A, j_min1	; tmp ← a[j-1]
-	CPA	tmp, A, j	; A[j - 1] > a[j] なら続ける
+	LD	tmp, A, j_min1	; tmp ← A[j-1]
+	CPA	tmp, A, j	; A[j - 1] > A[j] なら続ける
 	JMI	NEXT
 	JZE	NEXT
 	
@@ -31,7 +31,7 @@ INNER	CPA	j, =0		; j > 0 なら続ける
 	LAD	j_min1, -1, j	; j_min1 ← j - 1
 	LD	tmp2, A, j_min1
 	ST	tmp2, A, j	; A[j] = A[j - 1]
-	ST	tmp, A, j_min1	; a[j - 1] = tmp
+	ST	tmp, A, j_min1	; A[j - 1] = tmp
 	LAD	j, -1, j	; 内側のループインデックス j を -1
 	JUMP	INNER
 		
