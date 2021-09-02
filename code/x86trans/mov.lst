@@ -58,7 +58,7 @@ GAS LISTING mov.s 			page 1
   40 0062 8B4203   		movl	3(%edx), %eax		# eax:0x12345678
   41 0065 B9030000 		movl	$3, %ecx		# ecx:0x00000003
   41      00
-  42              		## EAX ← [val_b + ECX]
+  42              		## EAX ← [ECX + val_b]
 
 GAS LISTING mov.s 			page 2
 

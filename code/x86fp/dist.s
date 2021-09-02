@@ -5,7 +5,7 @@ _start:
 	fmul	%st(0), %st(0)		# ST(0) ← <*> ST(0)
 	fldl	y			# [y] をプッシュ
 	fmul	%st(0), %st(0)		# ST(0) ← <*> ST(0)
-	faddp	%st(0), %st(1)		# ST(1) ← <+> ST(0); トップを捨てる
+	faddp	%st(0), %st(1)		# ST(1) ← <+> ST(0), トップを捨てる
 	fsqrt				# ST(0) ← sqrt(ST(0))
 	fstpl	dist			# [dist] ← ST(0); トップを捨てる
 	

@@ -21,7 +21,7 @@ HANOI	RPUSH			; すべてのレジスタを退避
 	JUMP	FINISH
 	
 ABOVE1	LAD	GR1, -1, GR1	; 円盤の数 を -1
-	PUSH	0, GR3		; GR3 と GR3 を退避
+	PUSH	0, GR3		; GR3 と GR4 を退避
 	PUSH	0, GR4
 	LD	GR0, GR3	; GR3 と GR4 を交換
 	LD	GR3, GR4	; 「移動先」と「中間」を交換

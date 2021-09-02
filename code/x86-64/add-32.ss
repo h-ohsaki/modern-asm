@@ -1,7 +1,7 @@
 	.text
 main:
-	pushl	%esi			# RSP ← <-> 4, [RSP] ← ESI
-	pushl	%ebx			# RSP ← <-> 4, [RSP] ← EBX
+	pushl	%esi			# ESP ← <-> 4, [ESP] ← ESI
+	pushl	%ebx			# ESP ← <-> 4, [ESP] ← EBX
 	## i = 123
 	movl	$123, %esi		# ESI ← 123
 	## i = i + 1
@@ -12,6 +12,6 @@ main:
 	addl	%esi, %ebx		# EBX ← <+> ESI
 	## return j
 	movl	%ebx, %eax		# EAX ← EBX
-	popl	%ebx			# RBX ← [RSP], RSP ← <+> 4
-	popl	%esi			# ESI ← [RSP], RSP ← <+> 4
-	ret				# EIP ← [RSP], RSP ← <+> 4
+	popl	%ebx			# EBX ← [ESP], ESP ← <+> 4
+	popl	%esi			# ESI ← [ESP], ESP ← <+> 4
+	ret				# EIP ← [ESP], ESP ← <+> 4

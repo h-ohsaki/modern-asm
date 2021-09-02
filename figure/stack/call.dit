@@ -4,11 +4,11 @@
    | }                   |
    |                     |
    | int A(int n) {      |
-   |   return B(n) + 2;  |
+   |   return B(n + 2);  |
    | }                   |
    |                     |
    | int B(int n) {      |
-   |   return C(n) + 3;  |
+   |   return C(n + 3);  |
    | }                   |
    |                     |
    | int C(int n) {      |

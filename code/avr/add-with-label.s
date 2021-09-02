@@ -6,7 +6,7 @@ _start:
 	ldi	i, 12		; i ← 12
 	ldi	tmp, 34		; tmp ← 34
 	add	i, tmp		; i ← <+> tmp
-	sts	v, i		; (v) ← i
+	sts	v, i		; [v] ← i
 loop:
 	rjmp	loop		; pc ← loop
 

@@ -8,7 +8,7 @@ _start:
 	inc	%eax			# EAX ← <+> 1
 	cmpl	$4, %eax		# EAX == 4?
 	jl	1b			# より小さければ (前方の) ラベル 1 へジャンプ
-	fstpl	sum			# [sum] ← ST(0); トップを捨てる
+	fstpl	sum			# [sum] ← ST(0), トップを捨てる
 	
 	movl	$0, %ebx		# EBX ← 0 (終了ステータス)
 	movl	$1, %eax		# exit のシステムコールは 1 番

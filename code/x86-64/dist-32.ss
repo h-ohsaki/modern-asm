@@ -9,9 +9,9 @@ main:
         fmul    %st(0), %st		# ST(0) ← <*> ST(0)
         fldl    y			# [y] をプッシュ
         fmul    %st(0), %st		# ST(0) ← <*> ST(0)
-        faddp   %st, %st(1)		# ST(1) ← <+> ST(0); トップを捨てる
+        faddp   %st, %st(1)		# ST(1) ← <+> ST(0), トップを捨てる
         fsqrt				# ST(0) ← sqrt(ST(0))
-        fstpl   8(%esp)			# [ESP + 8] ← ST(0); トップを捨てる
+        fstpl   8(%esp)			# [ESP + 8] ← ST(0), トップを捨てる
 	## return 0
         movl    $0, %eax                # EAX ← 0
         leave                           # ESP ← EBP, EBP ← [ESP], ESP ← <+> 4
