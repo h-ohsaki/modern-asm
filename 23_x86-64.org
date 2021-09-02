@@ -155,10 +155,10 @@ Intel 64 アーキテクチャでも、
 | 汎用レジスタ数       | 16                                                                                          |
 | プログラムカウンタ   | RIP レジスタ                                                                                |
 | スタックポインタ     | RSP レジスタ                                                                                |
-| 特殊レジスタ         | セグメントレジスタ、FPU レジスタ、MMX レジスタ                                              |
+| 特殊レジスタ         | セグメントレジスタ、FPU レジスタ、MMX レジスタ、                                              |
 |                      | XMM レジスタ、YMM レジスタ、各種制御レジスタ                                                |
 | フラグレジスタ       | RFLAGS レジスタ                                                                             |
-|                      | OF フラグ、SF フラグ、ZF フラグ、PF フラグ、AF フラグ、ほか 6 種類                          |
+|                      | (OF フラグ、SF フラグ、ZF フラグ、PF フラグ、AF フラグほか 6 種類)                         |
 | 命令数               | 500 以上 (ニーモニック数)                                                                   |
 | 命令語の大きさ       | 1～15 バイト                                                                                |
 | データサイズ         | 64 ビット (クワッドワード)、32 ビット (ダブルワード)、16 ビット (ワード)、8 ビット (バイト) |
@@ -316,7 +316,7 @@ EDX 以外の汎用レジスタ (例えばレジスタ ESI や ESP) の下位 8 
 例えば、
 レジスタ RSI、
 RDI、
-EBP (ベースポインタ)、
+RBP (ベースポインタ)、
 RSP (スタックポインタ) の下位 8 ビットにも、
 レジスタ SIL、
 DIL、
@@ -364,7 +364,7 @@ AL にそれぞれ書き込むと、
 IA-32 アーキテクチャのスタックポインタは ESP レジスタであり、
 プログラムカウンタ (命令ポインタ) は EIP レジスタでした。
 Intel 64 アーキテクチャでは、
-アドレスは 64 ビットなので、
+アドレスが 64 ビットなので、
 スタックポインタは *64 ビットの RSP レジスタ*、
 プログラムカウンタも *64 ビットの RIP レジスタ* です。
 
@@ -660,7 +660,7 @@ Intel 64 アーキテクチャの 64 ビットには、
 | MOVSQ          | Move qword from address (R)SI to (R)DI.                                       |
 |                | アドレス (R)SI から (R)DI にクワッドワードをコピーする。                      |
 | MOVZX (64-bit) | Move bytes/words to doublewords/quadwords, zero-extension.                    |
-|                | バイト/ワードをダブルワード/クアッドワードにゼロ拡張する。                    |
+|                | バイト/ワードをダブルワード/クワッドワードにゼロ拡張する。                     |
 | STOSQ          | Store RAX at address RDI.                                                     |
 |                | RAX をアドレス RDI に格納する。                                               |
 | SWAPGS         | Exchanges current GS base register value with value in MSR address C0000102H. |
@@ -868,14 +868,14 @@ Desired=Unknown/Install/Remove/Purge/Hold
 ii  binutils       2.35.2-2     amd64        GNU assembler, linker and binary utilities
 ii  gcc-10         10.2.1-6     amd64        GNU C compiler
 $ gcc -dumpmachine              ↑ 64ビット (amd64) 版のパッケージがインストールされている
-x86_64-linux-gnu ← GCC の対象となるコンピュータは x86_64-linux-gnu
+x86_64-linux-gnu ← GCC の対象とするコンピュータは x86_64-linux-gnu
 $ as --version
 GNU assembler (GNU Binutils for Debian) 2.35.2
 Copyright (C) 2020 Free Software Foundation, Inc.
 This program is free software; you may redistribute it under the terms of
 the GNU General Public License version 3 or later.
 This program has absolutely no warranty.
-This assembler was configured for a target of `x86_64-linux-gnu'. ← GAS の対象となるコンピュータも同じ
+This assembler was configured for a target of `x86_64-linux-gnu'. ← GAS の対象とするコンピュータも同じ
 #+end_src
 オペレーティングシステムのアーキテクチャが amd64 で、
 GCC や GNU binutils の対象とするコンピュータのアーキテクチャが ~x86_64~ であることがわかります。
@@ -1154,10 +1154,10 @@ Intel 64 アーキテクチャにおける機械語の規則性が見えてき�
 即値を指定しない、
 レジスタどうしのデータ転送や算術演算の箇所がわかりやすいでしょう。
 #+begin_src asm
-   8 0015 88C3                  movb    %al, %bl                # BL ← <+> AL
-   9 0017 6689C3                movw    %ax, %bx                # BX ← <+> AX
-  10 001a 89C3                  movl    %eax, %ebx              # EBX ← <+> EAX
-  11 001c 4889C3                movq    %rax, %rbx              # RBX ← <+> RAX
+   8 0015 88C3                  movb    %al, %bl                # BL ← AL
+   9 0017 6689C3                movw    %ax, %bx                # BX ← AX
+  10 001a 89C3                  movl    %eax, %ebx              # EBX ← EAX
+  11 001c 4889C3                movq    %rax, %rbx              # RBX ← RAX
 	:
 	:
   17 002a 00C3                  addb    %al, %bl                # BL ← <+> AL
@@ -1303,7 +1303,7 @@ Intel 64 アーキテクチャでは、
 さきほどのプログラム ~add-static.c~ とほとんど同じですが、
 変数 ~i~ および ~j~ の型を ~int~ から ~long long~ に変更したプログラム ~add-longlong.c~ です (図 [[fig:x86-64/add-longlong.c]])。
 通常、
-64 ビット環境では、
+32 ビット環境および 64 ビット環境では、
 ~int~ 型の大きさが 32 ビットで、
 ~long long~ 型の大きさが 64 ビットです。
 
@@ -1464,7 +1464,7 @@ SIMD 命令用の XMM レジスタも必ず利用可能であり、
 main:
         leal    4(%esp), %ecx           # ECX ← ESP + 4
         andl    $-16, %esp              # ESP ← <&> 0xfffffff0
-        pushl   -4(%ecx)                # ESP ← <-> 4, [ESP] ← ECX - 4
+        pushl   -4(%ecx)                # ESP ← <-> 4, [ESP] ← 「ECX - 4」
 	:
 	:
         movl    -4(%ebp), %ecx          # ECX ← [EBP - 4]
@@ -1491,7 +1491,7 @@ GCC のコンパイル時オプションの設定によっては、
 まったく違って見えるようなアセンブリ言語プログラムが生成されることもあります。
 #+end_note
 
-*** 浮動小数点数演算の例 (ユークリッド距離の計算)
+*** 浮動小数点演算の例 (ユークリッド距離の計算)
 
 Intel 64 アーキテクチャの良さが感じられる例をもう 1 つ見てみましょう。
 浮動小数点数を扱うプログラム ~dist.c~ です。
@@ -1533,7 +1533,7 @@ C 言語で書かれたプログラム ~dist.c~ をアセンブリ言語プロ�
 *使用されている命令がまったく違う* ことがわかります。
 これは、
 [[sec:x86simd/ia32]] 節で述べたように、
-Intel 64 アーキテクチャでは浮動小数点数演算には、
+Intel 64 アーキテクチャでは浮動小数点演算には、
 x87 FPU 命令ではなく、
 *SIMD 命令を使う* からです。
 
@@ -1552,7 +1552,7 @@ GCC のコンパイル時オプションに、
 -msse -mfpath=sse
 #+end_src
 などを追加すれば、
-32 ビット環境であっても浮動小数点数演算に SIMD 命令を使うこともできます。
+32 ビット環境であっても浮動小数点演算に SIMD 命令を使うこともできます。
 #+end_note
 
 一方、
@@ -1571,9 +1571,9 @@ GCC のコンパイル時オプションに、
 -mfpmath=387
 #+end_src
 などを追加すれば、
-64 ビット環境であっても浮動小数点数演算に x87 FPU 命令を使います。
+64 ビット環境であっても浮動小数点演算に x87 FPU 命令を使います。
 ただし、
-一般には SSE 命令を用いた浮動小数点数演算のほうが、
+一般には SSE 命令を用いた浮動小数点演算のほうが、
 x87 FPU 命令を用いたものよりも高速なので、
 x87 FPU 命令を使うメリットはほとんどありません。
 #+end_note
