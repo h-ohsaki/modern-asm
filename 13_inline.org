@@ -433,8 +433,8 @@ C 言語で書かれた以下のプログラムを ~rdtsc.c~ として保存し�
 
 アセンブリ言語で書かれた以下のプログラムを ~rdtsc_asm.s~ として保存します。
 
-#+caption: ~inline/rdtsc_ascm.s~
-#+label: fig:inline/rdtsc_ascm.s
+#+caption: ~inline/rdtsc_asm.s~
+#+label: fig:inline/rdtsc_asm.s
 #+include: "code/inline/rdtsc_asm.s" src asm
 
 ~rdtsc.c~ および ~rdtsc_asm.s~ をそれぞれコンパイル、
